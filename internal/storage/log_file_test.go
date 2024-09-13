@@ -10,7 +10,7 @@ import (
 func TestAppend_And_Read(t *testing.T) {
 	file, err := os.CreateTemp("", "test_append")
 	require.NoError(t, err)
-	//defer os.Remove(file.Name())
+	defer os.Remove(file.Name())
 
 	log, err := NewLogFile(file.Name(), 1024)
 	require.NoError(t, err)
@@ -25,7 +25,7 @@ func TestAppend_And_Read(t *testing.T) {
 		require.Equal(t, msg, msgBytes)
 		currentPos += entryWidth
 	}
-
+	require.NoError(t, file.Close())
 	require.NoError(t, log.Close())
 }
 
