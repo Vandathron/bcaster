@@ -15,6 +15,10 @@ func TestAppend_And_Read(t *testing.T) {
 	log, err := NewLogFile(file.Name(), 1024)
 	require.NoError(t, err)
 	currentPos := 0
+	logFileInfo, err := log.file.Stat()
+	require.NoError(t, err)
+
+	require.Equal(t, int64(0), logFileInfo.Size())
 
 	for i := 0; i < 10; i++ {
 		msg := []byte(fmt.Sprintf("I love golan!, %d", i))
@@ -29,7 +33,7 @@ func TestAppend_And_Read(t *testing.T) {
 	require.NoError(t, log.Close())
 }
 
-func testAppend(t *testing.T, log *LogFile, msg []byte, expectedPos int64) {
+func testAppend(t *testing.T, log *msgFile, msg []byte, expectedPos int64) {
 	pos, err := log.Append(msg)
 	require.NoError(t, err)
 	require.Equal(t, uint64(expectedPos), pos)

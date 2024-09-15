@@ -15,7 +15,7 @@ const (
 type LogFileConfig struct {
 }
 
-type LogFile struct {
+type msgFile struct {
 	lck         sync.Mutex
 	currSize    uint64
 	file        *os.File
@@ -23,8 +23,8 @@ type LogFile struct {
 	maxFileSize uint64
 }
 
-func NewLogFile(filename string, maxFileSize uint64) (*LogFile, error) {
-	logFile := &LogFile{maxFileSize: maxFileSize}
+func NewLogFile(filename string, maxFileSize uint64) (*msgFile, error) {
+	logFile := &msgFile{maxFileSize: maxFileSize}
 
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
 
@@ -43,7 +43,7 @@ func NewLogFile(filename string, maxFileSize uint64) (*LogFile, error) {
 	return logFile, nil
 }
 
-func (l *LogFile) Append(data []byte) (pos uint64, err error) {
+func (l *msgFile) Append(data []byte) (pos uint64, err error) {
 	l.lck.Lock()
 	defer l.lck.Unlock()
 	dataLen := len(data)
@@ -69,7 +69,7 @@ func (l *LogFile) Append(data []byte) (pos uint64, err error) {
 	return pos, err
 }
 
-func (l *LogFile) Read(pos uint64) ([]byte, error) {
+func (l *msgFile) Read(pos uint64) ([]byte, error) {
 	l.lck.Lock()
 	defer l.lck.Unlock()
 
@@ -99,11 +99,11 @@ func (l *LogFile) Read(pos uint64) ([]byte, error) {
 	return msg, err
 }
 
-func (l *LogFile) CurrentSize() uint64 {
+func (l *msgFile) CurrentSize() uint64 {
 	return l.currSize
 }
 
-func (l *LogFile) Close() error {
+func (l *msgFile) Close() error {
 	l.lck.Lock()
 	defer l.lck.Unlock()
 	err := l.tempStorage.Flush()

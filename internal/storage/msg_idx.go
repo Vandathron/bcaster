@@ -14,15 +14,15 @@ const (
 	indexEntryWidth = offsetWidth + msgPosWidth // Full index entry by logic should occupy 12 bytes
 )
 
-type Idx struct {
+type msgIdx struct {
 	file     *os.File
 	mmap     gommap.MMap
 	currSize uint64
 	maxSize  uint64
 }
 
-func NewIndex(fileName string, maxSize uint64) (*Idx, error) {
-	idx := &Idx{maxSize: maxSize}
+func NewIndex(fileName string, maxSize uint64) (*msgIdx, error) {
+	idx := &msgIdx{maxSize: maxSize}
 	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
 
 	if err != nil {
@@ -47,7 +47,7 @@ func NewIndex(fileName string, maxSize uint64) (*Idx, error) {
 	return idx, nil
 }
 
-func (i *Idx) Append(off uint32, pos uint64) error {
+func (i *msgIdx) Append(off uint32, pos uint64) error {
 	if indexEntryWidth+i.currSize > i.maxSize {
 		return io.EOF
 	}
@@ -60,7 +60,7 @@ func (i *Idx) Append(off uint32, pos uint64) error {
 	return err
 }
 
-func (i *Idx) Read(off int32) (uint64, error) {
+func (i *msgIdx) Read(off int32) (uint64, error) {
 	startPos := uint32(0)
 	if off < -1 {
 		return 0, errors.New("offset out of range")
@@ -78,7 +78,7 @@ func (i *Idx) Read(off int32) (uint64, error) {
 	return entryPos, nil
 }
 
-func (i *Idx) Close() error {
+func (i *msgIdx) Close() error {
 	if err := i.mmap.Sync(gommap.MS_SYNC); err != nil { // synchronously flush to file
 		return err
 	}
