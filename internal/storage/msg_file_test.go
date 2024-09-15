@@ -12,7 +12,7 @@ func TestAppend_And_Read(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(file.Name())
 
-	log, err := NewLogFile(file.Name(), 1024)
+	log, err := NewMsgFile(file.Name(), 1024)
 	require.NoError(t, err)
 	currentPos := 0
 	logFileInfo, err := log.file.Stat()

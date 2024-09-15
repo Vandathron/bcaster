@@ -22,7 +22,7 @@ type msgIdx struct {
 
 func NewIndex(fileName string, maxSize uint64) (*msgIdx, error) {
 	idx := &msgIdx{maxSize: maxSize}
-	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
+	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0644)
 
 	if err != nil {
 		return nil, err

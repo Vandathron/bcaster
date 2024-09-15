@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"io"
 	"os"
 	"sync"
 )
@@ -23,7 +24,7 @@ type msgFile struct {
 	maxFileSize uint64
 }
 
-func NewLogFile(filename string, maxFileSize uint64) (*msgFile, error) {
+func NewMsgFile(filename string, maxFileSize uint64) (*msgFile, error) {
 	logFile := &msgFile{maxFileSize: maxFileSize}
 
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
@@ -43,55 +44,55 @@ func NewLogFile(filename string, maxFileSize uint64) (*msgFile, error) {
 	return logFile, nil
 }
 
-func (l *msgFile) Append(data []byte) (pos uint64, err error) {
-	l.lck.Lock()
-	defer l.lck.Unlock()
+func (m *msgFile) Append(data []byte) (pos uint64, err error) {
+	m.lck.Lock()
+	defer m.lck.Unlock()
 	dataLen := len(data)
 	entryWidth := dataLen + msgLenWidth
-	pos = l.currSize // new entry pos
+	pos = m.currSize // new entry pos
 
-	if l.currSize+uint64(entryWidth) > l.maxFileSize {
-		return pos, errors.New("unexpected behaviour: log file should not be active")
+	if m.currSize+uint64(entryWidth) > m.maxFileSize {
+		return pos, io.EOF
 	}
 
 	// Write data length (8 bytes) to temp storage
-	err = binary.Write(l.tempStorage, binary.BigEndian, uint64(dataLen))
+	err = binary.Write(m.tempStorage, binary.BigEndian, uint64(dataLen))
 	if err != nil {
 		return pos, err
 	}
 
-	_, err = l.tempStorage.Write(data)
+	_, err = m.tempStorage.Write(data)
 	if err != nil {
 		return pos, err
 	}
 
-	l.currSize += uint64(entryWidth)
+	m.currSize += uint64(entryWidth)
 	return pos, err
 }
 
-func (l *msgFile) Read(pos uint64) ([]byte, error) {
-	l.lck.Lock()
-	defer l.lck.Unlock()
+func (m *msgFile) Read(pos uint64) ([]byte, error) {
+	m.lck.Lock()
+	defer m.lck.Unlock()
 
-	if pos > l.currSize {
+	if pos > m.currSize {
 		return nil, errors.New("unexpected behaviour: pos should not exceed current size of log file")
 	}
 
-	err := l.tempStorage.Flush() // Write to permanent storage
+	err := m.tempStorage.Flush() // Write to permanent storage
 
 	if err != nil {
 		return nil, err
 	}
 
 	msgSizeBytes := make([]byte, msgLenWidth)
-	_, err = l.file.ReadAt(msgSizeBytes, int64(pos))
+	_, err = m.file.ReadAt(msgSizeBytes, int64(pos))
 	if err != nil {
 		return nil, err
 	}
 	msgSizeVal := binary.BigEndian.Uint64(msgSizeBytes)
 	msg := make([]byte, msgSizeVal)
 
-	_, err = l.file.ReadAt(msg, int64(pos+msgLenWidth))
+	_, err = m.file.ReadAt(msg, int64(pos+msgLenWidth))
 	if err != nil {
 		return nil, err
 	}
@@ -99,17 +100,21 @@ func (l *msgFile) Read(pos uint64) ([]byte, error) {
 	return msg, err
 }
 
-func (l *msgFile) CurrentSize() uint64 {
-	return l.currSize
+func (m *msgFile) CurrentSize() uint64 {
+	return m.currSize
 }
 
-func (l *msgFile) Close() error {
-	l.lck.Lock()
-	defer l.lck.Unlock()
-	err := l.tempStorage.Flush()
+func (m *msgFile) Close() error {
+	m.lck.Lock()
+	defer m.lck.Unlock()
+	err := m.tempStorage.Flush()
 	if err != nil {
 		return err
 	}
-	err = l.file.Close()
+	err = m.file.Close()
 	return err
+}
+
+func (m *msgFile) IsMaxedOut() bool {
+	return m.currSize >= m.maxFileSize
 }

@@ -79,7 +79,7 @@ func TestIndexRead(t *testing.T) {
 	}
 
 	for i := 0; i < entryCount; i++ {
-		pos, err := index.Read(int32(i))
+		pos, err := index.Read(uint32(i))
 		require.NoError(t, err)
 		require.Equal(t, uint64(i*5), pos)
 	}
