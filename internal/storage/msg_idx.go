@@ -2,7 +2,6 @@ package storage
 
 import (
 	"encoding/binary"
-	"errors"
 	"github.com/tysonmote/gommap"
 	"io"
 	"os"
@@ -60,22 +59,30 @@ func (i *msgIdx) Append(off uint32, pos uint64) error {
 	return err
 }
 
-func (i *msgIdx) Read(off int32) (uint64, error) {
-	startPos := uint32(0)
-	if off < -1 {
-		return 0, errors.New("offset out of range")
+func (i *msgIdx) Read(off uint32) (uint64, error) {
+	entryStartPos := off * indexEntryWidth
+
+	if uint64(entryStartPos) > i.currSize+indexEntryWidth { // Check offset is within index entries
+		return 0, io.EOF
 	}
 
-	if off == -1 { // Pick last file entry
-		startPos = uint32(i.currSize/indexEntryWidth) - 1
-	} else {
-		startPos = uint32(off * indexEntryWidth)
-	}
-
-	startPos += offsetWidth
-	endPos := startPos + indexEntryWidth
-	entryPos := binary.BigEndian.Uint64(i.mmap[startPos:endPos]) // Fetch entry position from index
+	entryEndPos := entryStartPos + indexEntryWidth
+	entryPos := binary.BigEndian.Uint64(i.mmap[entryStartPos+offsetWidth : entryEndPos]) // Fetch entry position from index
 	return entryPos, nil
+}
+
+func (i *msgIdx) LastEntry() (off uint32, pos uint64, err error) {
+	if indexEntryWidth > i.currSize { // Should have at least one entry
+		err = io.EOF
+		return
+	}
+
+	startPos := i.currSize - indexEntryWidth
+
+	off = binary.BigEndian.Uint32(i.mmap[startPos : startPos+offsetWidth])
+	pos = binary.BigEndian.Uint64(i.mmap[startPos+offsetWidth : startPos+indexEntryWidth])
+
+	return off, pos, nil
 }
 
 func (i *msgIdx) Close() error {
@@ -86,4 +93,8 @@ func (i *msgIdx) Close() error {
 		return err
 	}
 	return i.file.Close()
+}
+
+func (i *msgIdx) IsMaxedOut() bool {
+	return i.currSize >= i.maxSize
 }
