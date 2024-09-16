@@ -27,7 +27,7 @@ type msgFile struct {
 func NewMsgFile(filename string, maxFileSize uint64) (*msgFile, error) {
 	logFile := &msgFile{maxFileSize: maxFileSize}
 
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
 	if err != nil {
 		return nil, err
