@@ -37,7 +37,7 @@ func NewSegment(dir string, config config) (*Segment, error) {
 
 	lastOffset, _, err := s.index.LastEntry()
 
-	if s.IsFull() || err == io.EOF {
+	if err == io.EOF {
 		s.nextOffset = lastOffset
 	} else {
 		s.nextOffset = lastOffset + 1 // Set future entry write offset
