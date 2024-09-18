@@ -101,5 +101,5 @@ func (i *msgIdx) Close() error {
 }
 
 func (i *msgIdx) IsMaxedOut() bool {
-	return i.currSize >= i.maxSize
+	return i.currSize+indexEntryWidth >= i.maxSize
 }
