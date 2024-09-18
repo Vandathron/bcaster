@@ -104,6 +104,42 @@ func TestSegment_Full(t *testing.T) {
 	require.NoError(t, segment.Close())
 }
 
+func TestSegment_ExistingSegment(t *testing.T) {
+	dir, err := os.MkdirTemp("", "segment")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	c := config{
+		allowedIndexSize: uint64(300),
+		allowedMsgSize:   uint64(300),
+		startOffset:      0,
+	}
+
+	segment, err := NewSegment(dir, c)
+	require.NoError(t, err)
+	testMaxSize(t, 300, 300, segment)
+	msgByte, err := json.Marshal(message{Name: "Tosin", Event: "Test Segment"})
+	msgBlockSize := uint64(len(msgByte)) + 8
+	require.NoError(t, err)
+	offset, err := segment.Append(msgByte)
+	require.Equal(t, uint32(0), offset)
+	require.NoError(t, err)
+	require.NoError(t, segment.Close())
+
+	segment2, err := NewSegment(dir, c) // reopen files with existing data
+	require.NoError(t, err)
+
+	msgByte2, err := segment2.Read(uint32(0))
+	require.NoError(t, err)
+	require.Equal(t, msgByte, msgByte2)
+	require.Equal(t, uint32(1), segment2.nextOffset)
+	offset, err = segment2.Append(msgByte)
+	require.NoError(t, err)
+	require.Equal(t, uint32(1), offset)
+	require.Equal(t, msgBlockSize*2, segment2.msgFile.currSize) // confirm 2 messages were appended
+	require.NoError(t, segment2.Close())
+}
+
 func testMaxSize(t *testing.T, maxIdxSize, maxMsgSize uint64, s *Segment) {
 	require.Equal(t, maxIdxSize, s.index.maxSize)
 	require.Equal(t, maxMsgSize, s.msgFile.maxFileSize)
