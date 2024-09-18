@@ -61,12 +61,12 @@ func (i *msgIdx) Append(off uint32, pos uint64) error {
 
 func (i *msgIdx) Read(off uint32) (uint64, error) {
 	entryStartPos := off * indexEntryWidth
+	entryEndPos := entryStartPos + indexEntryWidth
 
-	if uint64(entryStartPos) > i.currSize+indexEntryWidth { // Check offset is within index entries
+	if uint64(entryEndPos) > i.currSize { // Check offset is within index entries
 		return 0, io.EOF
 	}
 
-	entryEndPos := entryStartPos + indexEntryWidth
 	entryPos := binary.BigEndian.Uint64(i.mmap[entryStartPos+offsetWidth : entryEndPos]) // Fetch entry position from index
 	return entryPos, nil
 }
@@ -92,6 +92,11 @@ func (i *msgIdx) Close() error {
 	if err := i.mmap.UnsafeUnmap(); err != nil {
 		return err
 	}
+
+	if err := i.file.Truncate(int64(i.currSize)); err != nil {
+		return err
+	}
+
 	return i.file.Close()
 }
 
