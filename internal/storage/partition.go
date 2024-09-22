@@ -105,11 +105,3 @@ func (p *Partition) Append(message []byte) (uint32, error) {
 
 	return off, nil
 }
-
-type StoreConfig struct {
-	AutoCreateTopic bool
-}
-
-type Store struct {
-	topicMap map[string]*Partition
-}
