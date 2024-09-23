@@ -39,8 +39,8 @@ func NewSegment(dir string, config segmentConfig) (*Segment, error) {
 
 	lastOffset, _, err := s.index.LastEntry()
 
-	if err == io.EOF { // indicates an empty index file. Next offset should be 0
-		s.nextOffset = lastOffset
+	if err == io.EOF { // indicates an empty index file. Next offset should be base offset
+		s.nextOffset = s.c.startOffset
 	} else {
 		s.nextOffset = lastOffset + 1 // Set future entry write offset
 	}
@@ -68,7 +68,7 @@ func (s *Segment) Read(offset uint32) ([]byte, error) {
 		return nil, io.EOF // Offset not within segment
 	}
 
-	pos, err := s.index.Read(offset)
+	pos, err := s.index.Read(offset - s.c.startOffset)
 	if err != nil {
 		return nil, err
 	}

@@ -148,4 +148,5 @@ func testMaxSize(t *testing.T, maxIdxSize, maxMsgSize uint64, s *Segment) {
 type message struct {
 	Name  string
 	Event string
+	Id    int
 }

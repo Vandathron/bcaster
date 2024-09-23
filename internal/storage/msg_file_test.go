@@ -21,7 +21,7 @@ func TestAppend_And_Read(t *testing.T) {
 	require.Equal(t, int64(0), logFileInfo.Size())
 
 	for i := 0; i < 10; i++ {
-		msg := []byte(fmt.Sprintf("I love golan!, %d", i))
+		msg := []byte(fmt.Sprintf("I love golang!, %d", i))
 		entryWidth := len(msg) + msgLenWidth
 		testAppend(t, log, msg, int64(currentPos))
 		msgBytes, err := log.Read(uint64(currentPos))
