@@ -19,10 +19,10 @@ func TestNewSegment(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	c := config{
-		allowedIndexSize: uint64(1024),
-		allowedMsgSize:   uint64(1024 * 3),
-		startOffset:      0,
+	c := segmentConfig{
+		maxIdxSizeByte: uint64(1024),
+		maxMsgSizeByte: uint64(1024 * 3),
+		startOffset:    0,
 	}
 
 	segment, err := NewSegment(dir, c)
@@ -44,10 +44,10 @@ func TestSegment_Read(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	c := config{
-		allowedIndexSize: uint64(1024),
-		allowedMsgSize:   uint64(1024 * 3),
-		startOffset:      0,
+	c := segmentConfig{
+		maxIdxSizeByte: uint64(1024),
+		maxMsgSizeByte: uint64(1024 * 3),
+		startOffset:    0,
 	}
 
 	segment, err := NewSegment(dir, c)
@@ -76,10 +76,10 @@ func TestSegment_Full(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	c := config{
-		allowedIndexSize: uint64(300),
-		allowedMsgSize:   uint64(300),
-		startOffset:      0,
+	c := segmentConfig{
+		maxIdxSizeByte: uint64(300),
+		maxMsgSizeByte: uint64(300),
+		startOffset:    0,
 	}
 
 	segment, err := NewSegment(dir, c)
@@ -109,10 +109,10 @@ func TestSegment_ExistingSegment(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	c := config{
-		allowedIndexSize: uint64(300),
-		allowedMsgSize:   uint64(300),
-		startOffset:      0,
+	c := segmentConfig{
+		maxIdxSizeByte: uint64(300),
+		maxMsgSizeByte: uint64(300),
+		startOffset:    0,
 	}
 
 	segment, err := NewSegment(dir, c)
