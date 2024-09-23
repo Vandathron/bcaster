@@ -6,30 +6,32 @@ import (
 	"path/filepath"
 )
 
-type config struct {
-	allowedIndexSize uint64
-	allowedMsgSize   uint64
-	startOffset      uint32
+type segmentConfig struct {
+	maxIdxSizeByte uint64
+	maxMsgSizeByte uint64
+	startOffset    uint32
 }
 
 type Segment struct {
-	index   *msgIdx
-	msgFile *msgFile
-	config
+	index      *msgIdx
+	msgFile    *msgFile
+	c          segmentConfig
 	nextOffset uint32
+	name       string
 }
 
-func NewSegment(dir string, config config) (*Segment, error) {
+func NewSegment(dir string, config segmentConfig) (*Segment, error) {
 	s := &Segment{
-		config: config,
+		c:    config,
+		name: formatName(config.startOffset, dir, ""),
 	}
 	var err error
-	s.index, err = NewIndex(filepath.Join(dir, fmt.Sprintf("%d%s", s.startOffset, ".index")), s.allowedIndexSize)
+	s.index, err = NewIndex(formatName(s.c.startOffset, dir, ".index"), s.c.maxIdxSizeByte)
 	if err != nil {
 		return nil, err
 	}
 
-	s.msgFile, err = NewMsgFile(filepath.Join(dir, fmt.Sprintf("%d%s", s.startOffset, ".message")), s.allowedMsgSize)
+	s.msgFile, err = NewMsgFile(formatName(s.c.startOffset, dir, ".message"), s.c.maxMsgSizeByte)
 	if err != nil {
 		_ = s.index.Close()
 		return nil, err
@@ -84,6 +86,10 @@ func (s *Segment) Close() error {
 		return err
 	}
 	return s.index.Close()
+}
+
+func formatName(startOffset uint32, dir, ext string) string {
+	return filepath.Join(dir, fmt.Sprintf("%d%s", startOffset, ext))
 }
 
 func (s *Segment) IsFull() bool {
