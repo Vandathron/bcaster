@@ -100,6 +100,13 @@ func (i *msgIdx) Close() error {
 	return i.file.Close()
 }
 
+func (i *msgIdx) Discard() error {
+	if err := i.Close(); err != nil {
+		return err
+	}
+	return os.Remove(i.file.Name())
+}
+
 func (i *msgIdx) IsMaxedOut() bool {
 	return i.currSize+indexEntryWidth >= i.maxSize
 }
