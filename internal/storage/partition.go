@@ -12,7 +12,7 @@ import (
 )
 
 type PartitionConfig struct {
-	dir            string
+	baseDir        string
 	maxIdxSizeByte uint64
 	maxMsgSizeByte uint64
 }
@@ -25,7 +25,7 @@ type Partition struct {
 }
 
 func NewPartition(topic string, c PartitionConfig) (*Partition, error) {
-	partitionDir := filepath.Join(c.dir, fmt.Sprintf("part_%s", topic))
+	partitionDir := filepath.Join(c.baseDir, fmt.Sprintf("part_%s", topic))
 	if err := os.MkdirAll(partitionDir, 0750); err != nil {
 		return nil, err
 	}
@@ -88,8 +88,7 @@ func (p *Partition) Append(message []byte) (uint32, error) {
 	off, err := p.writableSegment.Append(message)
 	if err != nil {
 		if err == io.EOF { // indicates a full segment and should create a new segment, then add/update writable segment
-
-			s, err := NewSegment(filepath.Join(p.dir, fmt.Sprintf("%d", p.writableSegment.nextOffset)), segmentConfig{
+			s, err := NewSegment(p.Name(), segmentConfig{
 				maxIdxSizeByte: p.maxIdxSizeByte,
 				maxMsgSizeByte: p.maxMsgSizeByte,
 				startOffset:    p.writableSegment.nextOffset,
@@ -128,7 +127,7 @@ func (p *Partition) getOffsetSegment(offset uint32) *Segment {
 }
 
 func (p *Partition) Name() string {
-	return filepath.Join(p.dir, fmt.Sprintf("part_%s", p.topic))
+	return filepath.Join(p.baseDir, fmt.Sprintf("part_%s", p.topic))
 }
 
 func (p *Partition) Close() error {
