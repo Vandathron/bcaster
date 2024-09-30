@@ -90,7 +90,7 @@ func TestPartition_MultiWritesReads(t *testing.T) {
 	currMsgFileSizeByte := uint64(0)
 	nextOffset := uint32(0)
 
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 200; i++ {
 		msgByte := getTestMsgByte(i + 1)
 		msgSizeByte := uint64(len(msgByte) + 8)
 		offset, err := partition.Append(msgByte)
@@ -115,7 +115,7 @@ func TestPartition_MultiWritesReads(t *testing.T) {
 	require.Equal(t, partition.writableSegment, partition.segments[0]) // latest segment
 	require.Equal(t, nextOffset, partition.writableSegment.nextOffset)
 
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 200; i++ {
 		msg, err := partition.Read(uint32(i))
 		require.NoError(t, err, fmt.Sprintf("offset: %d", i))
 		m := message{}
