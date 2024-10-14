@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/tysonmote/gommap"
+	"io"
 	"os"
 	"sync"
 )
@@ -58,4 +60,68 @@ func NewConsumer(fileName string, cfg config) (*Consumer, error) {
 	}
 	c.mmap = mmap
 	return c, nil
+}
+
+func (c *Consumer) Append(id []byte, nextOff uint64) (pos uint32, err error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	err = c.mmap.Sync(gommap.MS_SYNC) // flush consumers info to storage before resizing/truncation memory map to append new consumer
+	if err != nil {
+		return 0, err
+	}
+
+	if len(id) > idSize {
+		return 0, fmt.Errorf("ID of length %v exceeds maximum size of %v", len(id), idSize)
+	}
+
+	if !c.isSpaceAvailable() {
+		return 0, io.EOF
+	}
+
+	if err = c.makeSpaceForExtraConsumer(); err != nil {
+		return 0, err
+	}
+
+	buf := make([]byte, consumerSize)
+	copy(buf[:idSize], id)
+	binary.BigEndian.PutUint64(buf[idSize:idSize+offSize], nextOff)
+	binary.BigEndian.PutUint32(buf[idSize+offSize:], c.nextPos)
+	copy(c.mmap[c.nextPos:c.nextPos+uint32(consumerSize)], buf)
+
+	if err = c.mmap.Sync(gommap.MS_SYNC); err != nil {
+		return 0, err
+	}
+
+	pos = c.currSize
+	c.currSize += uint32(consumerSize)
+	c.nextPos = c.currSize
+	return pos, nil
+}
+
+func (c *Consumer) isSpaceAvailable() bool {
+	return c.currSize <= c.maxSize
+}
+
+func (c *Consumer) makeSpaceForExtraConsumer() error {
+	if !c.isSpaceAvailable() {
+		return io.EOF
+	}
+	err := os.Truncate(c.file.Name(), int64(c.currSize+uint32(consumerSize)))
+	if err != nil {
+		return err
+	}
+
+	if c.mmap != nil {
+		err = c.mmap.UnsafeUnmap() // syncs changes under the hood
+		if err != nil {
+			return err
+		}
+	}
+
+	c.mmap, err = gommap.Map(c.file.Fd(), gommap.PROT_READ|gommap.PROT_WRITE, gommap.MAP_SHARED)
+	if err != nil {
+		return err
+	}
+	return nil
 }
