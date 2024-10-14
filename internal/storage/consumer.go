@@ -99,6 +99,31 @@ func (c *Consumer) Append(id []byte, nextOff uint64) (pos uint32, err error) {
 	return pos, nil
 }
 
+func (c *Consumer) Read(pos uint32) (id []byte, nextOff uint64, err error) {
+	if pos >= c.nextPos {
+		return nil, 0, fmt.Errorf("invalid position %v. Last write pos: %v", pos, c.nextPos)
+	}
+
+	id = c.mmap[pos : pos+uint32(idSize)]
+	nextOff = binary.BigEndian.Uint64(c.mmap[pos+uint32(idSize) : pos+uint32(idSize+offSize)])
+	// update nextOffset
+	binary.BigEndian.PutUint64(c.mmap[pos+uint32(idSize+offSize):pos+uint32(consumerSize)], nextOff+1)
+
+	return id, nextOff, nil
+}
+
+func (c *Consumer) Close() error {
+	if err := c.mmap.UnsafeUnmap(); err != nil {
+		return err
+	}
+
+	if err := os.Truncate(c.file.Name(), int64(c.currSize)); err != nil {
+		return err
+	}
+
+	return c.file.Close()
+}
+
 func (c *Consumer) isSpaceAvailable() bool {
 	return c.currSize <= c.maxSize
 }
