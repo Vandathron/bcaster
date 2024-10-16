@@ -99,7 +99,7 @@ func (c *Consumer) Append(id []byte, nextOff uint64) (pos uint32, err error) {
 	return pos, nil
 }
 
-func (c *Consumer) Read(pos uint32) (id []byte, nextOff uint64, err error) {
+func (c *Consumer) Read(pos uint32, incOffset bool) (id []byte, nextOff uint64, err error) {
 	if pos >= c.nextPos {
 		return nil, 0, fmt.Errorf("invalid position %v. Last write pos: %v", pos, c.nextPos)
 	}
@@ -107,7 +107,9 @@ func (c *Consumer) Read(pos uint32) (id []byte, nextOff uint64, err error) {
 	id = c.mmap[pos : pos+uint32(idSize)]
 	nextOff = binary.BigEndian.Uint64(c.mmap[pos+uint32(idSize) : pos+uint32(idSize+offSize)])
 	// update nextOffset
-	binary.BigEndian.PutUint64(c.mmap[pos+uint32(idSize+offSize):pos+uint32(consumerSize)], nextOff+1)
+	if incOffset {
+		binary.BigEndian.PutUint64(c.mmap[pos+uint32(idSize+offSize):pos+uint32(consumerSize)], nextOff+1)
+	}
 
 	return id, nextOff, nil
 }
