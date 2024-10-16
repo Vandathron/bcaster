@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"github.com/tysonmote/gommap"
@@ -99,19 +100,41 @@ func (c *Consumer) Append(id []byte, nextOff uint64) (pos uint32, err error) {
 	return pos, nil
 }
 
-func (c *Consumer) Read(pos uint32, incOffset bool) (id []byte, nextOff uint64, err error) {
+func (c *Consumer) WriteAt(pos uint32, id []byte, nextOff uint64) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if len(id) > idSize {
+		return fmt.Errorf("ID of length %v exceeds maximum size of %v", len(id), idSize)
+	}
+
+	if pos >= c.nextPos {
+		return fmt.Errorf("invalid position %v. Last write pos: %v", pos, c.nextPos-1)
+	}
+
+	buf := make([]byte, consumerSize)
+	copy(buf[:idSize], id)
+	binary.BigEndian.PutUint64(buf[idSize:idSize+offSize], nextOff)
+	copy(c.mmap[pos:pos+uint32(idSize+offSize)], buf[:idSize+offSize])
+
+	if err := c.mmap.Sync(gommap.MS_ASYNC); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Consumer) Read(pos uint32, incOffset bool) (id []byte, off uint64, err error) {
 	if pos >= c.nextPos {
 		return nil, 0, fmt.Errorf("invalid position %v. Last write pos: %v", pos, c.nextPos)
 	}
 
-	id = c.mmap[pos : pos+uint32(idSize)]
-	nextOff = binary.BigEndian.Uint64(c.mmap[pos+uint32(idSize) : pos+uint32(idSize+offSize)])
+	id = bytes.Trim(c.mmap[pos:pos+uint32(idSize)], "\x00") // trim padded zero-bytes
+	off = binary.BigEndian.Uint64(c.mmap[pos+uint32(idSize) : pos+uint32(idSize+offSize)])
 	// update nextOffset
 	if incOffset {
-		binary.BigEndian.PutUint64(c.mmap[pos+uint32(idSize+offSize):pos+uint32(consumerSize)], nextOff+1)
+		binary.BigEndian.PutUint64(c.mmap[pos+uint32(idSize):pos+uint32(idSize+offSize)], off+1)
 	}
-
-	return id, nextOff, nil
+	return id, off, nil
 }
 
 func (c *Consumer) Close() error {
