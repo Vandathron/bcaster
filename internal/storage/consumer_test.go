@@ -88,3 +88,32 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	}
 	require.NoError(t, c.Close())
 }
+
+func TestConsumer_WriteAt(t *testing.T) {
+	file, err := os.CreateTemp("", "con.consumer")
+	require.NoError(t, err)
+	defer file.Close()
+	defer os.RemoveAll(file.Name())
+
+	c, err := NewConsumer(file.Name(), config{
+		maxSize: 1024 * 1024,
+	})
+	require.NoError(t, err)
+
+	// write 3 consumers
+	for i := 0; i < 3; i++ {
+		id := []byte("new_server_" + strconv.Itoa(i))
+		pos, err := c.Append(id, uint64(i))
+		require.NoError(t, err)
+		require.Equal(t, uint32(i*consumerSize), pos)
+	}
+
+	// update consumer 2
+	require.NoError(t, c.WriteAt(uint32(consumerSize*1), []byte("updated server"), uint64(30)))
+
+	// verify update
+	idBytes, off, err := c.Read(uint32(consumerSize*1), true)
+	require.NoError(t, err)
+	require.Equal(t, []byte("updated server"), idBytes)
+	require.Equal(t, uint64(30), off)
+}
