@@ -77,7 +77,7 @@ func (m *msgFile) Read(pos uint64) ([]byte, error) {
 	if pos > m.currSize {
 		return nil, errors.New("unexpected behaviour: pos should not exceed current size of log file")
 	}
-
+	// TODO: improve how flush is done. no flushing after every read.
 	err := m.tempStorage.Flush() // Write to permanent storage
 
 	if err != nil {
