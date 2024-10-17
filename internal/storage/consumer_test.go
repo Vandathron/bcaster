@@ -2,6 +2,7 @@ package storage
 
 import (
 	"github.com/stretchr/testify/require"
+	"github.com/vandathron/bcaster/internal/cfg"
 	"os"
 	"strconv"
 	"testing"
@@ -13,9 +14,7 @@ func TestNewConsumer(t *testing.T) {
 	defer file.Close()
 	defer os.Remove(file.Name())
 
-	c, err := NewConsumer(file.Name(), config{
-		maxSize: 1024 * 1024,
-	})
+	c, err := NewConsumer(file.Name(), consumerCfg())
 
 	require.NoError(t, err)
 	require.NoError(t, c.Close())
@@ -27,9 +26,7 @@ func TestConsumer_Append(t *testing.T) {
 	defer file.Close()
 	defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), config{
-		maxSize: 1024 * 1024,
-	})
+	c, err := NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
 
 	id := []byte("new_server_20")
@@ -47,9 +44,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	defer file.Close()
 	defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), config{
-		maxSize: 1024 * 1024,
-	})
+	c, err := NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
 
 	for i := 0; i < 20; i++ {
@@ -61,9 +56,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	require.NoError(t, c.Close())
 
 	// reopen file
-	c, err = NewConsumer(file.Name(), config{
-		maxSize: 1024 * 1024,
-	})
+	c, err = NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
 	for i := 0; i < 20; i++ {
 		idBytes, off, err := c.Read(uint32(i*consumerSize), true)
@@ -75,9 +68,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	require.NoError(t, c.Close())
 
 	// reopen file
-	c, err = NewConsumer(file.Name(), config{
-		maxSize: 1024 * 1024,
-	})
+	c, err = NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
 
 	// re-read consumer, consumer next read offset should add by 1
@@ -95,9 +86,7 @@ func TestConsumer_WriteAt(t *testing.T) {
 	defer file.Close()
 	defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), config{
-		maxSize: 1024 * 1024,
-	})
+	c, err := NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
 
 	// write 3 consumers
@@ -116,4 +105,10 @@ func TestConsumer_WriteAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("updated server"), idBytes)
 	require.Equal(t, uint64(30), off)
+}
+
+func consumerCfg() cfg.Consumer {
+	return cfg.Consumer{
+		MaxSize: 1024 * 1024,
+	}
 }
