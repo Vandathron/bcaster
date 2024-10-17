@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"github.com/vandathron/bcaster/internal/cfg"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,10 +16,12 @@ func TestNewPartition(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	topic := "customer_created"
-	config := PartitionConfig{
-		baseDir:        dir,
-		maxIdxSizeByte: 1024,
-		maxMsgSizeByte: 800,
+	config := cfg.Partition{
+		BaseDir: dir,
+		Segment: cfg.Segment{
+			MaxIdxSizeByte: 1024,
+			MaxMsgSizeByte: 800,
+		},
 	}
 
 	partition, err := NewPartition(topic, config)
@@ -27,7 +30,7 @@ func TestNewPartition(t *testing.T) {
 	require.Equal(t, 1, len(partition.segments)) // Initial empty partition should in turn contain one segment
 	require.NotNil(t, partition.writableSegment)
 	require.Equal(t, partition.writableSegment, partition.segments[0])
-	require.Equal(t, uint32(0), partition.writableSegment.c.startOffset)
+	require.Equal(t, uint32(0), partition.writableSegment.cfg.StartOffset)
 	require.Equal(t, filepath.Join(dir, "part_customer_created"), partition.Name())
 	require.NoError(t, partition.Close())
 }
@@ -68,7 +71,7 @@ func TestPartition_BasicAppendRead(t *testing.T) {
 	offset, err := partition.Append(msgByte)
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), offset)
-	require.Equal(t, uint32(0), partition.writableSegment.c.startOffset)
+	require.Equal(t, uint32(0), partition.writableSegment.cfg.StartOffset)
 	require.Equal(t, 1, len(partition.segments))
 	msg, err := partition.Read(offset)
 	require.NoError(t, err)
@@ -99,9 +102,9 @@ func TestPartition_MultiWritesReads(t *testing.T) {
 		currMsgFileSizeByte += msgSizeByte // msgSizeByte varies
 		currIdxEntrySizeByte := indexEntryWidth * uint64(offset+1)
 		segmentLen := uint64(len(partition.segments))
-		if currMsgFileSizeByte > config.maxMsgSizeByte*segmentLen || currIdxEntrySizeByte > config.maxIdxSizeByte*segmentLen { // indicates maxed out segment, hence partition should add new segment
+		if currMsgFileSizeByte > config.MaxMsgSizeByte*segmentLen || currIdxEntrySizeByte > config.MaxIdxSizeByte*segmentLen { // indicates maxed out segment, hence partition should add new segment
 			segmentCnt++
-			require.Equal(t, int(segmentCnt), len(partition.segments), fmt.Sprintf("offset: %d \n msgSize: %d totalMsgSize: %d, max: %d", offset, msgSizeByte, currMsgFileSizeByte, config.maxMsgSizeByte*segmentCnt))
+			require.Equal(t, int(segmentCnt), len(partition.segments), fmt.Sprintf("offset: %d \n msgSize: %d totalMsgSize: %d, max: %d", offset, msgSizeByte, currMsgFileSizeByte, config.MaxMsgSizeByte*segmentCnt))
 			require.Equal(t, partition.writableSegment, partition.segments[segmentCnt-1]) // latest segment should be the writable segment
 		}
 		nextOffset = offset + 1
@@ -139,10 +142,12 @@ func getTestMsgByte(id int) []byte {
 	return msgByte
 }
 
-func getPartitionConfig(dir string) PartitionConfig {
-	return PartitionConfig{
-		baseDir:        dir,
-		maxIdxSizeByte: 1024 * 500,
-		maxMsgSizeByte: 1024 * 1024,
+func getPartitionConfig(dir string) cfg.Partition {
+	return cfg.Partition{
+		BaseDir: dir,
+		Segment: cfg.Segment{
+			MaxIdxSizeByte: 1024 * 500,
+			MaxMsgSizeByte: 1024 * 1024,
+		},
 	}
 }

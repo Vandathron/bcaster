@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/vandathron/bcaster/internal/cfg"
 	"io"
 	"os"
 	"path"
@@ -11,21 +12,15 @@ import (
 	"strings"
 )
 
-type PartitionConfig struct {
-	baseDir        string
-	maxIdxSizeByte uint64
-	maxMsgSizeByte uint64
-}
-
 type Partition struct {
 	topic           string
 	segments        []*Segment
 	writableSegment *Segment
-	PartitionConfig
+	cfg             cfg.Partition
 }
 
-func NewPartition(topic string, c PartitionConfig) (*Partition, error) {
-	partitionDir := filepath.Join(c.baseDir, fmt.Sprintf("part_%s", topic))
+func NewPartition(topic string, c cfg.Partition) (*Partition, error) {
+	partitionDir := filepath.Join(c.BaseDir, fmt.Sprintf("part_%s", topic))
 	if err := os.MkdirAll(partitionDir, 0750); err != nil {
 		return nil, err
 	}
@@ -35,8 +30,8 @@ func NewPartition(topic string, c PartitionConfig) (*Partition, error) {
 		return nil, err
 	}
 	p := &Partition{
-		PartitionConfig: c,
-		topic:           topic,
+		cfg:   c,
+		topic: topic,
 	}
 
 	sort.Slice(segments, func(i, j int) bool { return segments[i].Name() < segments[j].Name() })
@@ -52,11 +47,9 @@ func NewPartition(topic string, c PartitionConfig) (*Partition, error) {
 			return nil, fmt.Errorf("invalid segment name. should be an integer: %s", segment.Name())
 		}
 
-		s, err := NewSegment(partitionDir, segmentConfig{
-			maxIdxSizeByte: p.maxIdxSizeByte,
-			maxMsgSizeByte: p.maxMsgSizeByte,
-			startOffset:    uint32(startOffset),
-		})
+		p.cfg.Segment.StartOffset = uint32(startOffset)
+
+		s, err := NewSegment(partitionDir, p.cfg.Segment)
 
 		if err != nil {
 			return nil, err
@@ -67,12 +60,8 @@ func NewPartition(topic string, c PartitionConfig) (*Partition, error) {
 	}
 
 	if len(segments) == 0 { // indicates an empty partition
-		startOffset := uint32(0)
-		s, err := NewSegment(partitionDir, segmentConfig{
-			maxIdxSizeByte: p.maxIdxSizeByte,
-			maxMsgSizeByte: p.maxMsgSizeByte,
-			startOffset:    startOffset,
-		})
+		p.cfg.Segment.StartOffset = uint32(0)
+		s, err := NewSegment(partitionDir, p.cfg.Segment)
 
 		if err != nil {
 			return nil, err
@@ -88,11 +77,9 @@ func (p *Partition) Append(message []byte) (uint32, error) {
 	off, err := p.writableSegment.Append(message)
 	if err != nil {
 		if err == io.EOF { // indicates a full segment and should create a new segment, then add/update writable segment
-			s, err := NewSegment(p.Name(), segmentConfig{
-				maxIdxSizeByte: p.maxIdxSizeByte,
-				maxMsgSizeByte: p.maxMsgSizeByte,
-				startOffset:    p.writableSegment.nextOffset,
-			})
+			p.cfg.Segment.StartOffset = p.writableSegment.nextOffset
+
+			s, err := NewSegment(p.Name(), p.cfg.Segment)
 
 			if err != nil {
 				return 0, err
@@ -119,7 +106,7 @@ func (p *Partition) Read(offset uint32) (message []byte, err error) {
 
 func (p *Partition) getOffsetSegment(offset uint32) *Segment {
 	for _, segment := range p.segments {
-		if offset >= segment.c.startOffset && offset < segment.nextOffset {
+		if offset >= segment.cfg.StartOffset && offset < segment.nextOffset {
 			return segment
 		}
 	}
@@ -127,7 +114,7 @@ func (p *Partition) getOffsetSegment(offset uint32) *Segment {
 }
 
 func (p *Partition) Name() string {
-	return filepath.Join(p.baseDir, fmt.Sprintf("part_%s", p.topic))
+	return filepath.Join(p.cfg.BaseDir, fmt.Sprintf("part_%s", p.topic))
 }
 
 func (p *Partition) Close() error {
