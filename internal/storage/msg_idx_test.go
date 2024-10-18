@@ -2,12 +2,13 @@ package storage
 
 import (
 	"github.com/stretchr/testify/require"
+	"github.com/vandathron/bcaster/internal/cfg"
 	"os"
 	"testing"
 )
 
 func TestNewIndexTruncateFile(t *testing.T) {
-	var indexFileSize = uint64(500)
+	idxCfg := cfg.Index{MaxSizeByte: uint64(500)}
 	file, err := os.CreateTemp("", "index_file_test")
 	require.NoError(t, err)
 	defer func(name string) {
@@ -22,17 +23,17 @@ func TestNewIndexTruncateFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(0), fInfo.Size()) // Empty file at this point
 
-	index, err := NewIndex(file.Name(), indexFileSize)
+	index, err := NewIndex(file.Name(), idxCfg)
 	require.NoError(t, err)
 	fInfo, err = index.file.Stat()
 	require.NoError(t, err)
-	require.Equal(t, indexFileSize, uint64(fInfo.Size()))
+	require.Equal(t, idxCfg.MaxSizeByte, uint64(fInfo.Size()))
 	require.Equal(t, uint64(0), index.currSize) // Current size should be 0 (regardless of truncate()) as no message has been appended to file
 	require.NoError(t, index.Close())
 }
 
 func TestIndexAppend(t *testing.T) {
-	maxIndexSize := uint64(500)
+	idxCfg := cfg.Index{MaxSizeByte: uint64(500)}
 	file, err := os.CreateTemp("", "index_file_test")
 	require.NoError(t, err)
 	defer func(name string) {
@@ -46,7 +47,7 @@ func TestIndexAppend(t *testing.T) {
 	fInfo, err := os.Stat(file.Name())
 	require.NoError(t, err)
 	require.Equal(t, int64(0), fInfo.Size())
-	index, err := NewIndex(file.Name(), maxIndexSize)
+	index, err := NewIndex(file.Name(), idxCfg)
 	require.NoError(t, err)
 	err = index.Append(0, 10)
 	require.NoError(t, err)
@@ -55,7 +56,7 @@ func TestIndexAppend(t *testing.T) {
 }
 
 func TestIndexRead(t *testing.T) {
-	maxIndexSize := uint64(1024)
+	idxCfg := cfg.Index{MaxSizeByte: uint64(1024)}
 	file, err := os.CreateTemp("", "index_file_test")
 	require.NoError(t, err)
 	defer func(name string) {
@@ -69,7 +70,7 @@ func TestIndexRead(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(0), fInfo.Size())
 
-	index, err := NewIndex(file.Name(), maxIndexSize)
+	index, err := NewIndex(file.Name(), idxCfg)
 	require.NoError(t, err)
 	idxSize, err := index.file.Stat()
 	require.NoError(t, err)
@@ -85,6 +86,6 @@ func TestIndexRead(t *testing.T) {
 	}
 
 	require.Equal(t, uint64(entryCount*indexEntryWidth), index.currSize)
-	require.Equal(t, int64(maxIndexSize), idxSize.Size())
+	require.Equal(t, int64(idxCfg.MaxSizeByte), idxSize.Size())
 	require.NoError(t, index.Close())
 }

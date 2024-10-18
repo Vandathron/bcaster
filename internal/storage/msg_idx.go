@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/binary"
 	"github.com/tysonmote/gommap"
+	"github.com/vandathron/bcaster/internal/cfg"
 	"io"
 	"os"
 )
@@ -17,11 +18,11 @@ type msgIdx struct {
 	file     *os.File
 	mmap     gommap.MMap
 	currSize uint64
-	maxSize  uint64
+	cfg      cfg.Index
 }
 
-func NewIndex(fileName string, maxSize uint64) (*msgIdx, error) {
-	idx := &msgIdx{maxSize: maxSize}
+func NewIndex(fileName string, cfg cfg.Index) (*msgIdx, error) {
+	idx := &msgIdx{cfg: cfg}
 	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
 
 	if err != nil {
@@ -36,7 +37,7 @@ func NewIndex(fileName string, maxSize uint64) (*msgIdx, error) {
 	idx.currSize = uint64(fInfo.Size())
 
 	// Attempts to truncate file size to max size specified as mmap attempts to map entire file to virtual address
-	err = f.Truncate(int64(maxSize))
+	err = f.Truncate(int64(idx.cfg.MaxSizeByte))
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func NewIndex(fileName string, maxSize uint64) (*msgIdx, error) {
 }
 
 func (i *msgIdx) Append(off uint32, pos uint64) error {
-	if indexEntryWidth+i.currSize > i.maxSize {
+	if indexEntryWidth+i.currSize > i.cfg.MaxSizeByte {
 		return io.EOF
 	}
 
@@ -108,5 +109,5 @@ func (i *msgIdx) Discard() error {
 }
 
 func (i *msgIdx) IsMaxedOut() bool {
-	return i.currSize+indexEntryWidth >= i.maxSize
+	return i.currSize+indexEntryWidth >= i.cfg.MaxSizeByte
 }

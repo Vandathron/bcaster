@@ -2,36 +2,33 @@ package storage
 
 import (
 	"fmt"
+	"github.com/vandathron/bcaster/internal/cfg"
 	"io"
 	"path/filepath"
 )
 
-type segmentConfig struct {
-	maxIdxSizeByte uint64
-	maxMsgSizeByte uint64
-	startOffset    uint32
-}
-
 type Segment struct {
 	index      *msgIdx
 	msgFile    *msgFile
-	c          segmentConfig
+	cfg        cfg.Segment
 	nextOffset uint32
 	name       string
 }
 
-func NewSegment(dir string, config segmentConfig) (*Segment, error) {
+func NewSegment(dir string, config cfg.Segment) (*Segment, error) {
 	s := &Segment{
-		c:    config,
-		name: formatName(config.startOffset, dir, ""),
+		cfg:  config,
+		name: formatName(config.StartOffset, dir, ""),
 	}
 	var err error
-	s.index, err = NewIndex(formatName(s.c.startOffset, dir, ".index"), s.c.maxIdxSizeByte)
+	s.index, err = NewIndex(formatName(s.cfg.StartOffset, dir, ".index"), cfg.Index{
+		MaxSizeByte: s.cfg.MaxIdxSizeByte,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	s.msgFile, err = NewMsgFile(formatName(s.c.startOffset, dir, ".message"), s.c.maxMsgSizeByte)
+	s.msgFile, err = NewMsgFile(formatName(s.cfg.StartOffset, dir, ".message"), s.cfg.MaxMsgSizeByte)
 	if err != nil {
 		_ = s.index.Close()
 		return nil, err
@@ -40,7 +37,7 @@ func NewSegment(dir string, config segmentConfig) (*Segment, error) {
 	lastOffset, _, err := s.index.LastEntry()
 
 	if err == io.EOF { // indicates an empty index file. Next offset should be base offset
-		s.nextOffset = s.c.startOffset
+		s.nextOffset = s.cfg.StartOffset
 	} else {
 		s.nextOffset = lastOffset + 1 // Set future entry write offset
 	}
@@ -68,7 +65,7 @@ func (s *Segment) Read(offset uint32) ([]byte, error) {
 		return nil, io.EOF // Offset not within segment
 	}
 
-	pos, err := s.index.Read(offset - s.c.startOffset)
+	pos, err := s.index.Read(offset - s.cfg.StartOffset)
 	if err != nil {
 		return nil, err
 	}
