@@ -34,7 +34,13 @@ func NewPartition(topic string, c cfg.Partition) (*Partition, error) {
 		topic: topic,
 	}
 
-	sort.Slice(segments, func(i, j int) bool { return segments[i].Name() < segments[j].Name() })
+	sort.Slice(segments, func(i, j int) bool {
+		parse := func(name string) int {
+			i, _ := strconv.Atoi(strings.TrimSuffix(name, path.Ext(name)))
+			return i
+		}
+		return parse(segments[i].Name()) < parse(segments[j].Name())
+	})
 
 	for i := 0; i < len(segments); i = i + 2 { // each segment has msg file and index file with same name. Makes sense to only get one of each.
 		segment := segments[i]
