@@ -17,6 +17,8 @@ func TestNewConsumer(t *testing.T) {
 	c, err := NewConsumer(file.Name(), consumerCfg())
 
 	require.NoError(t, err)
+	require.Equal(t, uint32(0), c.currSize)
+	require.Equal(t, uint32(0), c.nextOff)
 	require.NoError(t, c.Close())
 }
 
@@ -28,13 +30,14 @@ func TestConsumer_Append(t *testing.T) {
 
 	c, err := NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
-
 	id := []byte("new_server_20")
-	nxtOff := uint64(20)
-	pos, err := c.Append(id, nxtOff)
+	topic := []byte("new_user")
+	readOff := uint64(20)
+	off, err := c.Append(id, topic, readOff)
 	require.NoError(t, err)
-	require.Equal(t, uint32(0), pos)
-	require.Equal(t, uint32(consumerSize*1), c.nextPos)
+	require.Equal(t, uint32(0), off)
+	require.Equal(t, uint32(consumerSize), c.currSize)
+	require.Equal(t, uint32(1), c.nextOff)
 	require.NoError(t, c.Close())
 }
 
@@ -49,9 +52,11 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		id := []byte("new_server_" + strconv.Itoa(i))
-		pos, err := c.Append(id, uint64(i))
+		topic := []byte("new_user_event_" + strconv.Itoa(i))
+		off, err := c.Append(id, topic, uint64(i))
 		require.NoError(t, err)
-		require.Equal(t, uint32(i*consumerSize), pos)
+		require.Equal(t, uint32(i), off)
+		require.Equal(t, uint32((i+1)*consumerSize), c.currSize)
 	}
 	require.NoError(t, c.Close())
 
@@ -59,24 +64,35 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	c, err = NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
 	for i := 0; i < 20; i++ {
-		idBytes, off, err := c.Read(uint32(i*consumerSize), true)
+		id, topic, readOff, err := c.Read(uint32(i), false)
 		require.NoError(t, err)
 		expectedByte := []byte("new_server_" + strconv.Itoa(i))
-		require.Equal(t, expectedByte, idBytes)
-		require.Equal(t, uint64(i), off)
+		topicByte := []byte("new_user_event_" + strconv.Itoa(i))
+		require.Equal(t, expectedByte, id)
+		require.Equal(t, topicByte, topic)
+		require.Equal(t, uint64(i), readOff)
+
+		// test consumer id 5 offset was updated/increased
+		if i == 5 {
+			_, _, readOff, err = c.Read(uint32(i), false)
+			require.NoError(t, err)
+			require.Equal(t, uint64(i+1), readOff)
+		}
 	}
 	require.NoError(t, c.Close())
 
 	// reopen file
 	c, err = NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
+	require.Equal(t, uint32(20*consumerSize), c.currSize)
+	require.Equal(t, uint32(20), c.nextOff)
 
-	// re-read consumer, consumer next read offset should add by 1
-	for i := 0; i < 20; i++ {
-		_, off, err := c.Read(uint32(i*consumerSize), true)
-		require.NoError(t, err)
-		require.Equal(t, uint64(i+1), off)
-	}
+	// re-read consumer 6, consumer next read offset should increase by 1
+	id, topic, off, err := c.Read(6, true)
+	require.NoError(t, err)
+	require.Equal(t, []byte("new_server_6"), id)
+	require.Equal(t, []byte("new_user_event_6"), topic)
+	require.Equal(t, uint64(7), off)
 	require.NoError(t, c.Close())
 }
 
