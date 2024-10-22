@@ -111,7 +111,7 @@ func (c *Consumer) WriteAt(off uint32, id []byte, topic []byte, readOff uint64) 
 		return fmt.Errorf("topic of size %v exceeds max size of %v", len(topic), topicSize)
 	}
 
-	if c.nextOff >= off {
+	if off >= c.nextOff {
 		return fmt.Errorf("invalid offset %v. Last written offset: %v", off, c.nextOff-1)
 	}
 
