@@ -45,7 +45,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	file, err := os.CreateTemp("", "con.consumer")
 	require.NoError(t, err)
 	defer file.Close()
-	defer os.RemoveAll(file.Name())
+	//defer os.RemoveAll(file.Name())
 
 	c, err := NewConsumer(file.Name(), consumerCfg())
 	require.NoError(t, err)
@@ -108,19 +108,26 @@ func TestConsumer_WriteAt(t *testing.T) {
 	// write 3 consumers
 	for i := 0; i < 3; i++ {
 		id := []byte("new_server_" + strconv.Itoa(i))
-		pos, err := c.Append(id, uint64(i))
+		topic := []byte("new_user_event_" + strconv.Itoa(i))
+		off, err := c.Append(id, topic, uint64(i))
 		require.NoError(t, err)
-		require.Equal(t, uint32(i*consumerSize), pos)
+		require.Equal(t, uint32(i), off)
 	}
 
 	// update consumer 2
-	require.NoError(t, c.WriteAt(uint32(consumerSize*1), []byte("updated server"), uint64(30)))
+	require.NoError(t, c.WriteAt(uint32(1), []byte("updated server"), []byte("updated topic"), uint64(30)))
 
 	// verify update
-	idBytes, off, err := c.Read(uint32(consumerSize*1), true)
+	idBytes, topic, readOff, err := c.Read(uint32(1), false)
 	require.NoError(t, err)
 	require.Equal(t, []byte("updated server"), idBytes)
-	require.Equal(t, uint64(30), off)
+	require.Equal(t, []byte("updated topic"), topic)
+	require.Equal(t, uint64(30), readOff)
+
+	idBytes, topic, _, err = c.Read(uint32(0), false)
+	require.NoError(t, err)
+	require.Equal(t, []byte("new_server_0"), idBytes)
+	require.Equal(t, []byte("new_user_event_0"), topic)
 }
 
 func consumerCfg() cfg.Consumer {
