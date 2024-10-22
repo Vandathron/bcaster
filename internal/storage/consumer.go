@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/tysonmote/gommap"
-	"github.com/vandathron/bcaster/internal/cfg"
 	"io"
 	"os"
 	"sync"
@@ -21,14 +20,14 @@ var (
 type Consumer struct {
 	file     *os.File
 	mmap     gommap.MMap
-	cfg      cfg.Consumer
+	maxSize  uint32
 	currSize uint32
 	lock     sync.Mutex
 	nextOff  uint32
 }
 
-func NewConsumer(fileName string, cfg cfg.Consumer) (*Consumer, error) {
-	c := &Consumer{cfg: cfg}
+func NewConsumer(fileName string, maxSize uint32) (*Consumer, error) {
+	c := &Consumer{maxSize: maxSize}
 
 	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
@@ -41,8 +40,8 @@ func NewConsumer(fileName string, cfg cfg.Consumer) (*Consumer, error) {
 
 	c.file = file
 	c.currSize = uint32(fileInf.Size())
-	if c.currSize > c.cfg.MaxSize {
-		return nil, fmt.Errorf("current file size %d exceeds max size %d", c.currSize, c.cfg.MaxSize)
+	if c.currSize > c.maxSize {
+		return nil, fmt.Errorf("current file size %d exceeds max size %d", c.currSize, c.maxSize)
 	}
 
 	c.nextOff = c.currSize / uint32(consumerSize)
@@ -161,7 +160,7 @@ func (c *Consumer) Close() error {
 }
 
 func (c *Consumer) isMaxed() bool {
-	return c.currSize+uint32(consumerSize) > c.cfg.MaxSize
+	return c.currSize+uint32(consumerSize) > c.maxSize
 }
 
 func (c *Consumer) makeSpaceForExtraConsumer() error {

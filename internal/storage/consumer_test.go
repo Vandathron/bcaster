@@ -2,7 +2,6 @@ package storage
 
 import (
 	"github.com/stretchr/testify/require"
-	"github.com/vandathron/bcaster/internal/cfg"
 	"os"
 	"strconv"
 	"testing"
@@ -14,7 +13,7 @@ func TestNewConsumer(t *testing.T) {
 	defer file.Close()
 	defer os.Remove(file.Name())
 
-	c, err := NewConsumer(file.Name(), consumerCfg())
+	c, err := NewConsumer(file.Name(), 1024*1024)
 
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), c.currSize)
@@ -28,7 +27,7 @@ func TestConsumer_Append(t *testing.T) {
 	defer file.Close()
 	defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), consumerCfg())
+	c, err := NewConsumer(file.Name(), 1024*1024)
 	require.NoError(t, err)
 	id := []byte("new_server_20")
 	topic := []byte("new_user")
@@ -47,7 +46,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	defer file.Close()
 	//defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), consumerCfg())
+	c, err := NewConsumer(file.Name(), 1024*1024)
 	require.NoError(t, err)
 
 	for i := 0; i < 20; i++ {
@@ -61,7 +60,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	require.NoError(t, c.Close())
 
 	// reopen file
-	c, err = NewConsumer(file.Name(), consumerCfg())
+	c, err = NewConsumer(file.Name(), 1024*1024)
 	require.NoError(t, err)
 	for i := 0; i < 20; i++ {
 		id, topic, readOff, err := c.Read(uint32(i), false)
@@ -82,7 +81,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	require.NoError(t, c.Close())
 
 	// reopen file
-	c, err = NewConsumer(file.Name(), consumerCfg())
+	c, err = NewConsumer(file.Name(), 1024*1024)
 	require.NoError(t, err)
 	require.Equal(t, uint32(20*consumerSize), c.currSize)
 	require.Equal(t, uint32(20), c.nextOff)
@@ -102,7 +101,7 @@ func TestConsumer_WriteAt(t *testing.T) {
 	defer file.Close()
 	defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), consumerCfg())
+	c, err := NewConsumer(file.Name(), 1024*1024)
 	require.NoError(t, err)
 
 	// write 3 consumers
@@ -128,10 +127,4 @@ func TestConsumer_WriteAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("new_server_0"), idBytes)
 	require.Equal(t, []byte("new_user_event_0"), topic)
-}
-
-func consumerCfg() cfg.Consumer {
-	return cfg.Consumer{
-		MaxSize: 1024 * 1024,
-	}
 }
