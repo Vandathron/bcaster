@@ -12,9 +12,9 @@ import (
 
 var (
 	offSize      = 8  // 8 bytes as offsetSize
-	idSize       = 35 // 35 bytes as ID size
-	topicSize    = 35 // 35 bytes as topic
-	consumerSize = offSize + idSize + topicSize
+	IdSize       = 35 // 35 bytes as ID size
+	TopicSize    = 35 // 35 bytes as topic
+	consumerSize = offSize + IdSize + TopicSize
 )
 
 type Consumer struct {
@@ -68,12 +68,12 @@ func (c *Consumer) Append(id []byte, topic []byte, readOff uint64) (off uint32, 
 		return 0, err
 	}
 
-	if len(id) > idSize {
-		return 0, fmt.Errorf("ID of length %v exceeds maximum size of %v", len(id), idSize)
+	if len(id) > IdSize {
+		return 0, fmt.Errorf("ID of length %v exceeds maximum size of %v", len(id), IdSize)
 	}
 
-	if len(topic) > topicSize {
-		return 0, fmt.Errorf("topic of size %v exceeds max size of %v", len(topic), topicSize)
+	if len(topic) > TopicSize {
+		return 0, fmt.Errorf("topic of size %v exceeds max size of %v", len(topic), TopicSize)
 	}
 
 	if c.isMaxed() {
@@ -85,9 +85,9 @@ func (c *Consumer) Append(id []byte, topic []byte, readOff uint64) (off uint32, 
 	}
 
 	buf := make([]byte, consumerSize)
-	copy(buf[:idSize], id)
-	copy(buf[idSize:idSize+topicSize], topic)
-	binary.BigEndian.PutUint64(buf[idSize+topicSize:], readOff)
+	copy(buf[:IdSize], id)
+	copy(buf[IdSize:IdSize+TopicSize], topic)
+	binary.BigEndian.PutUint64(buf[IdSize+TopicSize:], readOff)
 	copy(c.mmap[c.currSize:c.currSize+uint32(consumerSize)], buf)
 
 	if err = c.mmap.Sync(gommap.MS_SYNC); err != nil {
@@ -102,12 +102,12 @@ func (c *Consumer) Append(id []byte, topic []byte, readOff uint64) (off uint32, 
 func (c *Consumer) WriteAt(off uint32, id []byte, topic []byte, readOff uint64) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if len(id) > idSize {
-		return fmt.Errorf("ID of length %v exceeds maximum size of %v", len(id), idSize)
+	if len(id) > IdSize {
+		return fmt.Errorf("ID of length %v exceeds maximum size of %v", len(id), IdSize)
 	}
 
-	if len(topic) > topicSize {
-		return fmt.Errorf("topic of size %v exceeds max size of %v", len(topic), topicSize)
+	if len(topic) > TopicSize {
+		return fmt.Errorf("topic of size %v exceeds max size of %v", len(topic), TopicSize)
 	}
 
 	if off >= c.nextOff {
@@ -115,9 +115,9 @@ func (c *Consumer) WriteAt(off uint32, id []byte, topic []byte, readOff uint64) 
 	}
 
 	buf := make([]byte, consumerSize)
-	copy(buf[:idSize], id)
-	copy(buf[idSize:idSize+topicSize], topic)
-	binary.BigEndian.PutUint64(buf[idSize+topicSize:], readOff)
+	copy(buf[:IdSize], id)
+	copy(buf[IdSize:IdSize+TopicSize], topic)
+	binary.BigEndian.PutUint64(buf[IdSize+TopicSize:], readOff)
 	startPos := off * uint32(consumerSize)
 	copy(c.mmap[startPos:startPos+uint32(consumerSize)], buf)
 
@@ -130,18 +130,18 @@ func (c *Consumer) WriteAt(off uint32, id []byte, topic []byte, readOff uint64) 
 
 func (c *Consumer) Read(off uint32, ignoreOff bool) (id []byte, topic []byte, readOff uint64, err error) {
 	if off >= c.nextOff {
-		return nil, nil, 0, fmt.Errorf("invalid offset %v. Last written offset: %v", off, c.nextOff-1)
+		return nil, nil, 0, io.EOF
 	}
 
 	startPos := off * uint32(consumerSize)
 	consumer := c.mmap[startPos : startPos+uint32(consumerSize)]
-	id = bytes.Trim(consumer[:idSize], "\x00")                    // trim padded zero-bytes
-	topic = bytes.Trim(consumer[idSize:idSize+topicSize], "\x00") // trim padded zero-bytes
-	readOff = binary.BigEndian.Uint64(consumer[idSize+topicSize:])
+	id = bytes.Trim(consumer[:IdSize], "\x00")                    // trim padded zero-bytes
+	topic = bytes.Trim(consumer[IdSize:IdSize+TopicSize], "\x00") // trim padded zero-bytes
+	readOff = binary.BigEndian.Uint64(consumer[IdSize+TopicSize:])
 
 	// update nextOffset
 	if !ignoreOff {
-		binary.BigEndian.PutUint64(c.mmap[startPos+uint32(idSize+topicSize):], readOff+1)
+		binary.BigEndian.PutUint64(c.mmap[startPos+uint32(IdSize+TopicSize):], readOff+1)
 	}
 
 	return id, topic, readOff, nil
@@ -157,6 +157,10 @@ func (c *Consumer) Close() error {
 	}
 
 	return c.file.Close()
+}
+
+func (c *Consumer) LatestIdx() uint32 {
+	return c.nextOff - 1
 }
 
 func (c *Consumer) isMaxed() bool {
