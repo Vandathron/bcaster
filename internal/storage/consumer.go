@@ -13,9 +13,9 @@ import (
 
 var (
 	offSize      = 8  // 8 bytes as offsetSize
-	idSize       = 30 // 30 bytes as ID size
-	posSize      = 4  // 4 bytes to store consumer position in file
-	consumerSize = offSize + idSize + posSize
+	idSize       = 35 // 35 bytes as ID size
+	topicSize    = 35 // 35 bytes as topic
+	consumerSize = offSize + idSize + topicSize
 )
 
 type Consumer struct {
@@ -24,7 +24,7 @@ type Consumer struct {
 	cfg      cfg.Consumer
 	currSize uint32
 	lock     sync.Mutex
-	nextPos  uint32
+	nextOff  uint32
 }
 
 func NewConsumer(fileName string, cfg cfg.Consumer) (*Consumer, error) {
@@ -45,7 +45,7 @@ func NewConsumer(fileName string, cfg cfg.Consumer) (*Consumer, error) {
 		return nil, fmt.Errorf("current file size %d exceeds max size %d", c.currSize, c.cfg.MaxSize)
 	}
 
-	c.nextPos = c.currSize
+	c.nextOff = c.currSize / uint32(consumerSize)
 	if c.currSize == 0 { // truncate the empty file to allow for memory-mapping
 		if err := c.file.Truncate(int64(consumerSize)); err != nil {
 			return nil, err
@@ -60,7 +60,7 @@ func NewConsumer(fileName string, cfg cfg.Consumer) (*Consumer, error) {
 	return c, nil
 }
 
-func (c *Consumer) Append(id []byte, nextOff uint64) (pos uint32, err error) {
+func (c *Consumer) Append(id []byte, topic []byte, readOff uint64) (off uint32, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -73,7 +73,11 @@ func (c *Consumer) Append(id []byte, nextOff uint64) (pos uint32, err error) {
 		return 0, fmt.Errorf("ID of length %v exceeds maximum size of %v", len(id), idSize)
 	}
 
-	if !c.isSpaceAvailable() {
+	if len(topic) > topicSize {
+		return 0, fmt.Errorf("topic of size %v exceeds max size of %v", len(topic), topicSize)
+	}
+
+	if c.isMaxed() {
 		return 0, io.EOF
 	}
 
@@ -83,35 +87,40 @@ func (c *Consumer) Append(id []byte, nextOff uint64) (pos uint32, err error) {
 
 	buf := make([]byte, consumerSize)
 	copy(buf[:idSize], id)
-	binary.BigEndian.PutUint64(buf[idSize:idSize+offSize], nextOff)
-	binary.BigEndian.PutUint32(buf[idSize+offSize:], c.nextPos)
-	copy(c.mmap[c.nextPos:c.nextPos+uint32(consumerSize)], buf)
+	copy(buf[idSize:idSize+topicSize], topic)
+	binary.BigEndian.PutUint64(buf[idSize+topicSize:], readOff)
+	copy(c.mmap[c.currSize:c.currSize+uint32(consumerSize)], buf)
 
 	if err = c.mmap.Sync(gommap.MS_SYNC); err != nil {
 		return 0, err
 	}
-
-	pos = c.currSize
+	off = c.nextOff
 	c.currSize += uint32(consumerSize)
-	c.nextPos = c.currSize
-	return pos, nil
+	c.nextOff++ // update next offset to write
+	return off, nil
 }
 
-func (c *Consumer) WriteAt(pos uint32, id []byte, nextOff uint64) error {
+func (c *Consumer) WriteAt(off uint32, id []byte, topic []byte, readOff uint64) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if len(id) > idSize {
 		return fmt.Errorf("ID of length %v exceeds maximum size of %v", len(id), idSize)
 	}
 
-	if pos >= c.nextPos {
-		return fmt.Errorf("invalid position %v. Last write pos: %v", pos, c.nextPos-1)
+	if len(topic) > topicSize {
+		return fmt.Errorf("topic of size %v exceeds max size of %v", len(topic), topicSize)
+	}
+
+	if c.nextOff >= off {
+		return fmt.Errorf("invalid offset %v. Last written offset: %v", off, c.nextOff-1)
 	}
 
 	buf := make([]byte, consumerSize)
 	copy(buf[:idSize], id)
-	binary.BigEndian.PutUint64(buf[idSize:idSize+offSize], nextOff)
-	copy(c.mmap[pos:pos+uint32(idSize+offSize)], buf[:idSize+offSize])
+	copy(buf[idSize:idSize+topicSize], topic)
+	binary.BigEndian.PutUint64(buf[idSize+topicSize:], readOff)
+	startPos := off * uint32(consumerSize)
+	copy(c.mmap[startPos:startPos+uint32(consumerSize)], buf)
 
 	if err := c.mmap.Sync(gommap.MS_ASYNC); err != nil {
 		return err
@@ -120,18 +129,23 @@ func (c *Consumer) WriteAt(pos uint32, id []byte, nextOff uint64) error {
 	return nil
 }
 
-func (c *Consumer) Read(pos uint32, incOffset bool) (id []byte, off uint64, err error) {
-	if pos >= c.nextPos {
-		return nil, 0, fmt.Errorf("invalid position %v. Last write pos: %v", pos, c.nextPos)
+func (c *Consumer) Read(off uint32, ignoreOff bool) (id []byte, topic []byte, readOff uint64, err error) {
+	if off >= c.nextOff {
+		return nil, nil, 0, fmt.Errorf("invalid offset %v. Last written offset: %v", off, c.nextOff-1)
 	}
 
-	id = bytes.Trim(c.mmap[pos:pos+uint32(idSize)], "\x00") // trim padded zero-bytes
-	off = binary.BigEndian.Uint64(c.mmap[pos+uint32(idSize) : pos+uint32(idSize+offSize)])
+	startPos := off * uint32(consumerSize)
+	consumer := c.mmap[startPos : startPos+uint32(consumerSize)]
+	id = bytes.Trim(consumer[:idSize], "\x00")                    // trim padded zero-bytes
+	topic = bytes.Trim(consumer[idSize:idSize+topicSize], "\x00") // trim padded zero-bytes
+	readOff = binary.BigEndian.Uint64(consumer[idSize+topicSize:])
+
 	// update nextOffset
-	if incOffset {
-		binary.BigEndian.PutUint64(c.mmap[pos+uint32(idSize):pos+uint32(idSize+offSize)], off+1)
+	if !ignoreOff {
+		binary.BigEndian.PutUint64(c.mmap[startPos+uint32(idSize+topicSize):], readOff+1)
 	}
-	return id, off, nil
+
+	return id, topic, readOff, nil
 }
 
 func (c *Consumer) Close() error {
@@ -146,12 +160,12 @@ func (c *Consumer) Close() error {
 	return c.file.Close()
 }
 
-func (c *Consumer) isSpaceAvailable() bool {
-	return c.currSize <= c.cfg.MaxSize
+func (c *Consumer) isMaxed() bool {
+	return c.currSize+uint32(consumerSize) > c.cfg.MaxSize
 }
 
 func (c *Consumer) makeSpaceForExtraConsumer() error {
-	if !c.isSpaceAvailable() {
+	if c.isMaxed() {
 		return io.EOF
 	}
 	err := os.Truncate(c.file.Name(), int64(c.currSize+uint32(consumerSize)))
