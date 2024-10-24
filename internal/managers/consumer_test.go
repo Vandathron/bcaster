@@ -45,7 +45,7 @@ func TestConsumerMgr_Subscribe(t *testing.T) {
 		Dir:     dir,
 	})
 	defer func() {
-		//os.RemoveAll(dir)
+		os.RemoveAll(dir)
 		m.Close()
 	}()
 
