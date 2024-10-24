@@ -87,3 +87,31 @@ func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
 
 	return m, nil
 }
+func (m *ConsumerMgr) Subscribe(consumer model.Consumer) error {
+	if err := m.validate(consumer); err != nil {
+		return err
+	}
+	// TODO: should lock/unlock here
+	if consumers, ok := m.topicToConsumer[consumer.Topic]; ok {
+		for _, c := range consumers {
+			if c.ID == consumer.ID {
+				return nil
+			}
+		}
+	}
+
+	off, err := m.activeConsumer.Append([]byte(consumer.ID), []byte(consumer.Topic), consumer.ReadOffset)
+	if err != nil {
+		if err == io.EOF {
+			err = m.injectNewActiveConsumer(fmt.Sprintf("%v.consumers", len(m.consumers)))
+			if err != nil {
+				return err
+			}
+			return m.Subscribe(consumer)
+		}
+		return err
+	}
+	consumer.Off = off
+	m.topicToConsumer[consumer.Topic] = append(m.topicToConsumer[consumer.Topic], &consumer)
+	return nil
+}
