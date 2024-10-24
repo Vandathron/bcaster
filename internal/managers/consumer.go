@@ -87,6 +87,7 @@ func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
 
 	return m, nil
 }
+
 func (m *ConsumerMgr) Subscribe(consumer model.Consumer) error {
 	if err := m.validate(consumer); err != nil {
 		return err
@@ -139,4 +140,67 @@ func (m *ConsumerMgr) ReadTopic(topic string) ([]model.Consumer, error) {
 	}
 
 	return nil, fmt.Errorf("topic not found")
+}
+func (m *ConsumerMgr) Ack(id, topic string) error {
+	if consumers, ok := m.topicToConsumer[topic]; ok {
+		for _, c := range consumers {
+			if c.ID == id {
+				c.ReadOffset++
+				return nil
+			}
+		}
+		return fmt.Errorf("consumer not found for topic: %s", topic)
+	}
+
+	return fmt.Errorf("topic not found")
+}
+
+func (m *ConsumerMgr) Unsubscribe(id, topic string) error {
+	if consumers, ok := m.topicToConsumer[topic]; ok {
+		for _, c := range consumers {
+			if c.ID == id {
+				c.ReadOffset = 0 // TODO: Should empty consumer block in file
+				return nil
+			}
+		}
+		return fmt.Errorf("consumer not found for topic: %s", topic)
+	}
+
+	return fmt.Errorf("topic not found")
+}
+
+func (m *ConsumerMgr) Close() error {
+	for _, consumer := range m.consumers {
+		err := consumer.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *ConsumerMgr) getConsumer(c *model.Consumer) model.Consumer {
+	return *c
+}
+
+func (m *ConsumerMgr) injectNewActiveConsumer(name string) error {
+	p := path.Join(m.cfg.Dir, name)
+	c, err := storage.NewConsumer(p, m.cfg.MaxSize)
+	if err != nil {
+		return err
+	}
+	m.consumers = append(m.consumers, c)
+	m.activeConsumer = c
+	return err
+}
+func (m *ConsumerMgr) validate(consumer model.Consumer) error {
+	if len([]byte(consumer.Topic)) > storage.TopicSize {
+		return errors.New("topic exceeds allowed size")
+	}
+
+	if len([]byte(consumer.ID)) > storage.IdSize {
+		return errors.New("id exceeds allowed size")
+	}
+
+	return nil
 }
