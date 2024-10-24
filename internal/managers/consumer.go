@@ -115,3 +115,28 @@ func (m *ConsumerMgr) Subscribe(consumer model.Consumer) error {
 	m.topicToConsumer[consumer.Topic] = append(m.topicToConsumer[consumer.Topic], &consumer)
 	return nil
 }
+
+func (m *ConsumerMgr) Read(id, topic string) (readOff uint64, err error) {
+	if consumers, ok := m.topicToConsumer[topic]; ok {
+		for _, c := range consumers {
+			if c.ID == id {
+				return c.ReadOffset, nil
+			}
+		}
+		return 0, fmt.Errorf("consumer not found for topic: %s", topic)
+	}
+
+	return 0, fmt.Errorf("topic not found")
+}
+
+func (m *ConsumerMgr) ReadTopic(topic string) ([]model.Consumer, error) {
+	if consumers, ok := m.topicToConsumer[topic]; ok {
+		var c []model.Consumer
+		for _, con := range consumers {
+			c = append(c, m.getConsumer(con))
+		}
+		return c, nil
+	}
+
+	return nil, fmt.Errorf("topic not found")
+}
