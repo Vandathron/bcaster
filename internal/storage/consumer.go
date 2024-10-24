@@ -24,10 +24,11 @@ type Consumer struct {
 	currSize uint32
 	lock     sync.Mutex
 	nextOff  uint32
+	baseOff  uint32
 }
 
-func NewConsumer(fileName string, maxSize uint32) (*Consumer, error) {
-	c := &Consumer{maxSize: maxSize}
+func NewConsumer(fileName string, maxSize uint32, baseOff uint32) (*Consumer, error) {
+	c := &Consumer{maxSize: maxSize, baseOff: baseOff}
 
 	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
@@ -44,7 +45,7 @@ func NewConsumer(fileName string, maxSize uint32) (*Consumer, error) {
 		return nil, fmt.Errorf("current file size %d exceeds max size %d", c.currSize, c.maxSize)
 	}
 
-	c.nextOff = c.currSize / uint32(consumerSize)
+	c.nextOff = c.currSize/uint32(consumerSize) + baseOff
 	if c.currSize == 0 { // truncate the empty file to allow for memory-mapping
 		if err := c.file.Truncate(int64(consumerSize)); err != nil {
 			return nil, err
@@ -159,7 +160,7 @@ func (c *Consumer) Close() error {
 	return c.file.Close()
 }
 
-func (c *Consumer) LatestIdx() uint32 {
+func (c *Consumer) LatestCommitedOff() uint32 {
 	return c.nextOff - 1
 }
 

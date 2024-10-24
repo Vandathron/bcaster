@@ -13,7 +13,7 @@ func TestNewConsumer(t *testing.T) {
 	defer file.Close()
 	defer os.Remove(file.Name())
 
-	c, err := NewConsumer(file.Name(), 1024*1024)
+	c, err := NewConsumer(file.Name(), 1024*1024, 0)
 
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), c.currSize)
@@ -27,7 +27,7 @@ func TestConsumer_Append(t *testing.T) {
 	defer file.Close()
 	defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), 1024*1024)
+	c, err := NewConsumer(file.Name(), 1024*1024, 0)
 	require.NoError(t, err)
 	id := []byte("new_server_20")
 	topic := []byte("new_user")
@@ -46,7 +46,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	defer file.Close()
 	//defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), 1024*1024)
+	c, err := NewConsumer(file.Name(), 1024*1024, 0)
 	require.NoError(t, err)
 
 	for i := 0; i < 20; i++ {
@@ -60,7 +60,7 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	require.NoError(t, c.Close())
 
 	// reopen file
-	c, err = NewConsumer(file.Name(), 1024*1024)
+	c, err = NewConsumer(file.Name(), 1024*1024, 0)
 	require.NoError(t, err)
 	for i := 0; i < 20; i++ {
 		id, topic, readOff, err := c.Read(uint32(i), false)
@@ -81,10 +81,11 @@ func TestConsumer_AppendReadMultiple(t *testing.T) {
 	require.NoError(t, c.Close())
 
 	// reopen file
-	c, err = NewConsumer(file.Name(), 1024*1024)
+	c, err = NewConsumer(file.Name(), 1024*1024, 0)
 	require.NoError(t, err)
 	require.Equal(t, uint32(20*consumerSize), c.currSize)
 	require.Equal(t, uint32(20), c.nextOff)
+	require.Equal(t, uint32(20-1), c.LatestCommitedOff())
 
 	// re-read consumer 6, consumer next read offset should increase by 1
 	id, topic, off, err := c.Read(6, true)
@@ -101,7 +102,7 @@ func TestConsumer_WriteAt(t *testing.T) {
 	defer file.Close()
 	defer os.RemoveAll(file.Name())
 
-	c, err := NewConsumer(file.Name(), 1024*1024)
+	c, err := NewConsumer(file.Name(), 1024*1024, 0)
 	require.NoError(t, err)
 
 	// write 3 consumers
