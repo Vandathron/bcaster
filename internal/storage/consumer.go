@@ -27,10 +27,10 @@ type Consumer struct {
 	baseOff  uint32
 }
 
-func NewConsumer(fileName string, maxSize uint32, baseOff uint32) (*Consumer, error) {
+func NewConsumer(filePath string, maxSize uint32, baseOff uint32) (*Consumer, error) {
 	c := &Consumer{maxSize: maxSize, baseOff: baseOff}
 
-	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (c *Consumer) WriteAt(off uint32, id []byte, topic []byte, readOff uint64) 
 	copy(buf[:IdSize], id)
 	copy(buf[IdSize:IdSize+TopicSize], topic)
 	binary.BigEndian.PutUint64(buf[IdSize+TopicSize:], readOff)
-	startPos := off * uint32(consumerSize)
+	startPos := (off - c.baseOff) * uint32(consumerSize)
 	copy(c.mmap[startPos:startPos+uint32(consumerSize)], buf)
 
 	if err := c.mmap.Sync(gommap.MS_ASYNC); err != nil {
@@ -134,7 +134,7 @@ func (c *Consumer) Read(off uint32, ignoreOff bool) (id []byte, topic []byte, re
 		return nil, nil, 0, io.EOF
 	}
 
-	startPos := off * uint32(consumerSize)
+	startPos := (off - c.baseOff) * uint32(consumerSize)
 	consumer := c.mmap[startPos : startPos+uint32(consumerSize)]
 	id = bytes.Trim(consumer[:IdSize], "\x00")                    // trim padded zero-bytes
 	topic = bytes.Trim(consumer[IdSize:IdSize+TopicSize], "\x00") // trim padded zero-bytes
