@@ -22,10 +22,8 @@ type ConsumerMgr struct {
 }
 
 func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
-	if cfg.MaxSize > 1024*1024*2 {
-		return nil, errors.New("consumer size too large")
-	}
-	if cfg.MaxSize == 0 || cfg.MaxSize < 1024*500 { // 500kb
+
+	if cfg.MaxSize == 0 || cfg.MaxSize < 1024*70 { // 70kb
 		cfg.MaxSize = (1024 * 1024) / 0.5 // 0.5mb
 	}
 
