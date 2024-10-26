@@ -19,6 +19,7 @@ type ConsumerMgr struct {
 	topicToConsumer map[string][]*model.Consumer
 	cfg             cfg.Consumer
 	activeConsumer  *storage.Consumer
+	lock            sync.Mutex
 }
 
 func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
