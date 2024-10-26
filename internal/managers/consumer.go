@@ -203,3 +203,17 @@ func (m *ConsumerMgr) validate(consumer model.Consumer) error {
 
 	return nil
 }
+
+func (m *ConsumerMgr) consumerStoreByOffset(off uint32) *storage.Consumer {
+	if len(m.consumers) == 0 {
+		return nil
+	}
+
+	// m.consumers is sorted by baseOffset (ASC)
+	for _, c := range m.consumers {
+		if off <= c.LatestCommitedOff() {
+			return c
+		}
+	}
+	return nil
+}
