@@ -192,6 +192,7 @@ func (m *ConsumerMgr) injectNewActiveConsumer(name string) error {
 	m.activeConsumer = c
 	return err
 }
+
 func (m *ConsumerMgr) validate(consumer model.Consumer) error {
 	if len([]byte(consumer.Topic)) > storage.TopicSize {
 		return errors.New("topic exceeds allowed size")
