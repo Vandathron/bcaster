@@ -46,8 +46,9 @@ func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
 		if file.IsDir() || path.Ext(file.Name()) != ".consumer" {
 			continue
 		}
-
-		c, err := storage.NewConsumer(file.Name(), m.cfg.MaxSize)
+		baseOff, _ := strconv.Atoi(strings.TrimSuffix(file.Name(), path.Ext(file.Name())))
+		filePath := filepath.Join(m.cfg.Dir, file.Name())
+		c, err := storage.NewConsumer(filePath, m.cfg.MaxSize, uint32(baseOff))
 		if err != nil {
 			func() {
 				for _, consumer := range m.consumers {
@@ -197,7 +198,7 @@ func (m *ConsumerMgr) getConsumer(c *model.Consumer) model.Consumer {
 }
 
 func (m *ConsumerMgr) injectNewActiveConsumer(name string, baseOff uint32) error {
-	p := path.Join(m.cfg.Dir, name)
+	p := filepath.Join(m.cfg.Dir, name)
 	c, err := storage.NewConsumer(p, m.cfg.MaxSize, baseOff)
 	if err != nil {
 		return err
