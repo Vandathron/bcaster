@@ -155,10 +155,24 @@ func (m *ConsumerMgr) Ack(id, topic string) error {
 }
 
 func (m *ConsumerMgr) Unsubscribe(id, topic string) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	if consumers, ok := m.topicToConsumer[topic]; ok {
-		for _, c := range consumers {
+		for i, c := range consumers {
 			if c.ID == id {
-				c.ReadOffset = 0 // TODO: Should empty consumer block in file
+				cs := m.consumerStoreByOffset(c.Off)
+				if cs == nil {
+					return fmt.Errorf("consumer %s not found for topic: %s", id, topic)
+				}
+				err := cs.WriteAt(c.Off, []byte{}, []byte{}, c.ReadOffset)
+				if err != nil {
+					return err
+				}
+				consumers = append(consumers[:i], consumers[i+1:]...)
+				m.topicToConsumer[topic] = consumers
+				if len(consumers) == 0 {
+					delete(m.topicToConsumer, topic)
+				}
 				return nil
 			}
 		}
