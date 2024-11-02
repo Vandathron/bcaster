@@ -100,10 +100,6 @@ func TestConsumerMgr_Subscribe(t *testing.T) {
 
 }
 
-func TestConsumerMgr_Unsubscribe(t *testing.T) {
-
-}
-
 func TestConsumerMgr_Read(t *testing.T) {
 	dir, err := os.MkdirTemp("", "consumers")
 	require.NoError(t, err)
