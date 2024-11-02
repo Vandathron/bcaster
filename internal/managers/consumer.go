@@ -9,9 +9,11 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type ConsumerMgr struct {
@@ -42,6 +44,7 @@ func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
 		return parse(consumerFiles[i].Name()) < parse(consumerFiles[j].Name())
 	})
 
+	m.topicToConsumer = make(map[string][]*model.Consumer)
 	for _, file := range consumerFiles {
 		if file.IsDir() || path.Ext(file.Name()) != ".consumer" {
 			continue
@@ -58,7 +61,7 @@ func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
 			return nil, err
 		}
 
-		for i := 0; ; i++ {
+		for i := baseOff; ; i++ {
 			id, topic, readOff, err := c.Read(uint32(i), true)
 			if err != nil {
 				if err == io.EOF {
@@ -68,6 +71,11 @@ func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
 				return nil, err
 			}
 			topicStr := string(topic)
+			idStr := string(id)
+			if topicStr == "" && idStr == "" { // no need to load consumers that have unsubscribed
+				continue
+			}
+
 			m.topicToConsumer[topicStr] = append(m.topicToConsumer[topicStr], &model.Consumer{
 				ID:         string(id),
 				Topic:      topicStr,
@@ -76,10 +84,11 @@ func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
 			})
 		}
 		m.consumers = append(m.consumers, c)
+		m.activeConsumer = c // updates eventually to latest
 	}
 
 	if len(m.consumers) == 0 {
-		err := m.injectNewActiveConsumer("0.consumer")
+		err := m.injectNewActiveConsumer("0.consumer", uint32(0))
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +101,8 @@ func (m *ConsumerMgr) Subscribe(consumer model.Consumer) error {
 	if err := m.validate(consumer); err != nil {
 		return err
 	}
-	// TODO: should lock/unlock here
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	if consumers, ok := m.topicToConsumer[consumer.Topic]; ok {
 		for _, c := range consumers {
 			if c.ID == consumer.ID {
@@ -103,14 +113,19 @@ func (m *ConsumerMgr) Subscribe(consumer model.Consumer) error {
 
 	off, err := m.activeConsumer.Append([]byte(consumer.ID), []byte(consumer.Topic), consumer.ReadOffset)
 	if err != nil {
-		if err == io.EOF {
-			err = m.injectNewActiveConsumer(fmt.Sprintf("%v.consumers", len(m.consumers)))
+		if err == io.EOF { // indicates activeConsumer is maxed out. get consumer's latest committed offset
+			baseOff := m.activeConsumer.LatestCommitedOff() + 1
+			err = m.injectNewActiveConsumer(fmt.Sprintf("%v.consumer", baseOff), baseOff)
 			if err != nil {
 				return err
 			}
-			return m.Subscribe(consumer)
+			off, err = m.activeConsumer.Append([]byte(consumer.ID), []byte(consumer.Topic), consumer.ReadOffset)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
 		}
-		return err
 	}
 	consumer.Off = off
 	m.topicToConsumer[consumer.Topic] = append(m.topicToConsumer[consumer.Topic], &consumer)
@@ -141,11 +156,14 @@ func (m *ConsumerMgr) ReadTopic(topic string) ([]model.Consumer, error) {
 
 	return nil, fmt.Errorf("topic not found")
 }
+
 func (m *ConsumerMgr) Ack(id, topic string) error {
 	if consumers, ok := m.topicToConsumer[topic]; ok {
 		for _, c := range consumers {
 			if c.ID == id {
+				m.lock.Unlock()
 				c.ReadOffset++
+				m.lock.Lock()
 				return nil
 			}
 		}
