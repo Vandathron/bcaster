@@ -43,8 +43,10 @@ func TestConsumer_Append(t *testing.T) {
 func TestConsumer_AppendReadMultiple(t *testing.T) {
 	file, err := os.CreateTemp("", "con.consumer")
 	require.NoError(t, err)
-	defer file.Close()
-	//defer os.RemoveAll(file.Name())
+	defer func() {
+		file.Close()
+		os.RemoveAll(file.Name())
+	}()
 
 	c, err := NewConsumer(file.Name(), 1024*1024, 0)
 	require.NoError(t, err)
