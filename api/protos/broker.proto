@@ -1,0 +1,27 @@
+syntax = "proto3";
+package bcaster.v1;
+
+option go_package = "github.com/vandathron/bcaster/api/protos";
+
+service Broker {
+  rpc Publish (PublishRequest) returns (PublishResponse);
+  rpc Subscribe (SubscribeRequest) returns (SubscribeResponse);
+}
+
+message PublishRequest {
+  string topic = 1;
+  bytes value = 2;
+}
+
+message PublishResponse {
+  bool success = 1;
+  double offset = 2;
+}
+
+message SubscribeRequest {
+
+}
+
+message SubscribeResponse {
+
+}
