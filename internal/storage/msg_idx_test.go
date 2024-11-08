@@ -52,7 +52,7 @@ func TestIndexAppend(t *testing.T) {
 	err = index.Append(0, 10)
 	require.NoError(t, err)
 	require.NoError(t, index.Close())
-	require.Equal(t, uint64(12), index.currSize)
+	require.Equal(t, uint64(indexEntryWidth), index.currSize)
 }
 
 func TestIndexRead(t *testing.T) {
@@ -76,11 +76,11 @@ func TestIndexRead(t *testing.T) {
 	require.NoError(t, err)
 	entryCount := 50
 	for i := 0; i < entryCount; i++ {
-		require.NoError(t, index.Append(uint32(i), uint64(5*i)), i)
+		require.NoError(t, index.Append(uint64(i), uint64(5*i)), i)
 	}
 
 	for i := 0; i < entryCount; i++ {
-		pos, err := index.Read(uint32(i))
+		pos, err := index.Read(uint64(i))
 		require.NoError(t, err)
 		require.Equal(t, uint64(i*5), pos)
 	}
