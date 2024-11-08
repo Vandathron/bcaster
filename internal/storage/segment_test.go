@@ -36,7 +36,7 @@ func TestNewSegment(t *testing.T) {
 	off, err := segment.Append(msgByte)
 	require.NoError(t, err)
 	require.Equal(t, segment.msgFile.currSize, msgSize+8) // 8 bytes inclusive considering the length of message saved in an 8 bytes block
-	require.Equal(t, uint32(0), off)
+	require.Equal(t, uint64(0), off)
 	require.NoError(t, segment.Close())
 }
 
@@ -60,8 +60,8 @@ func TestSegment_Read(t *testing.T) {
 	off, err := segment.Append(msgByte)
 	require.NoError(t, err)
 	require.Equal(t, segment.msgFile.currSize, msgSize+8)
-	require.Equal(t, uint32(1), segment.nextOffset)
-	require.Equal(t, uint32(0), off)
+	require.Equal(t, uint64(1), segment.nextOffset)
+	require.Equal(t, uint64(0), off)
 	msg, err := segment.Read(0)
 	require.NoError(t, err)
 	m := &message{}
@@ -95,10 +95,10 @@ func TestSegment_Full(t *testing.T) {
 			require.Error(t, io.EOF, err)
 			continue
 		}
-		require.Equal(t, uint32(i+1), segment.nextOffset)
+		require.Equal(t, uint64(i+1), segment.nextOffset)
 		require.Equal(t, uint64(i+1)*indexEntryWidth, segment.index.currSize)
-		require.Equal(t, uint32(i), offset)
-		require.Equal(t, uint64(offset+1)*msgBlockSize, segment.msgFile.currSize)
+		require.Equal(t, uint64(i), offset)
+		require.Equal(t, (offset+1)*msgBlockSize, segment.msgFile.currSize)
 	}
 
 	require.Equal(t, 5*msgBlockSize, segment.msgFile.currSize)
@@ -123,20 +123,20 @@ func TestSegment_ExistingSegment(t *testing.T) {
 	msgBlockSize := uint64(len(msgByte)) + 8
 	require.NoError(t, err)
 	offset, err := segment.Append(msgByte)
-	require.Equal(t, uint32(0), offset)
+	require.Equal(t, uint64(0), offset)
 	require.NoError(t, err)
 	require.NoError(t, segment.Close())
 
 	segment2, err := NewSegment(dir, c) // reopen files with existing data
 	require.NoError(t, err)
 
-	msgByte2, err := segment2.Read(uint32(0))
+	msgByte2, err := segment2.Read(uint64(0))
 	require.NoError(t, err)
 	require.Equal(t, msgByte, msgByte2)
-	require.Equal(t, uint32(1), segment2.nextOffset)
+	require.Equal(t, uint64(1), segment2.nextOffset)
 	offset, err = segment2.Append(msgByte)
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), offset)
+	require.Equal(t, uint64(1), offset)
 	require.Equal(t, msgBlockSize*2, segment2.msgFile.currSize) // confirm 2 messages were appended
 	require.NoError(t, segment2.Close())
 }

@@ -30,7 +30,7 @@ func TestNewPartition(t *testing.T) {
 	require.Equal(t, 1, len(partition.segments)) // Initial empty partition should in turn contain one segment
 	require.NotNil(t, partition.writableSegment)
 	require.Equal(t, partition.writableSegment, partition.segments[0])
-	require.Equal(t, uint32(0), partition.writableSegment.cfg.StartOffset)
+	require.Equal(t, uint64(0), partition.writableSegment.cfg.StartOffset)
 	require.Equal(t, filepath.Join(dir, "part_customer_created"), partition.Name())
 	require.NoError(t, partition.Close())
 }
@@ -70,8 +70,8 @@ func TestPartition_BasicAppendRead(t *testing.T) {
 	require.NoError(t, err)
 	offset, err := partition.Append(msgByte)
 	require.NoError(t, err)
-	require.Equal(t, uint32(0), offset)
-	require.Equal(t, uint32(0), partition.writableSegment.cfg.StartOffset)
+	require.Equal(t, uint64(0), offset)
+	require.Equal(t, uint64(0), partition.writableSegment.cfg.StartOffset)
 	require.Equal(t, 1, len(partition.segments))
 	msg, err := partition.Read(offset)
 	require.NoError(t, err)
@@ -91,14 +91,14 @@ func TestPartition_MultiWritesReads(t *testing.T) {
 	segmentCnt := uint64(len(partition.segments))
 	require.Equal(t, uint64(1), segmentCnt)
 	currMsgFileSizeByte := uint64(0)
-	nextOffset := uint32(0)
+	nextOffset := uint64(0)
 
 	for i := 0; i < 200; i++ {
 		msgByte := getTestMsgByte(i + 1)
 		msgSizeByte := uint64(len(msgByte) + 8)
 		offset, err := partition.Append(msgByte)
 		require.NoError(t, err)
-		require.Equal(t, uint32(i), offset)
+		require.Equal(t, uint64(i), offset)
 		currMsgFileSizeByte += msgSizeByte // msgSizeByte varies
 		currIdxEntrySizeByte := indexEntryWidth * uint64(offset+1)
 		segmentLen := uint64(len(partition.segments))
@@ -119,7 +119,7 @@ func TestPartition_MultiWritesReads(t *testing.T) {
 	require.Equal(t, nextOffset, partition.writableSegment.nextOffset)
 
 	for i := 0; i < 200; i++ {
-		msg, err := partition.Read(uint32(i))
+		msg, err := partition.Read(uint64(i))
 		require.NoError(t, err, fmt.Sprintf("offset: %d", i))
 		m := message{}
 		err = json.Unmarshal(msg, &m)

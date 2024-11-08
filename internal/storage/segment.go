@@ -8,10 +8,10 @@ import (
 )
 
 type Segment struct {
-	index      *msgIdx
+	index      *MsgIdx
 	msgFile    *msgFile
 	cfg        cfg.Segment
-	nextOffset uint32
+	nextOffset uint64
 	name       string
 }
 
@@ -45,7 +45,7 @@ func NewSegment(dir string, config cfg.Segment) (*Segment, error) {
 	return s, nil
 }
 
-func (s *Segment) Append(msg []byte) (uint32, error) {
+func (s *Segment) Append(msg []byte) (uint64, error) {
 	pos, err := s.msgFile.Append(msg)
 	if err != nil {
 		return 0, err
@@ -60,7 +60,7 @@ func (s *Segment) Append(msg []byte) (uint32, error) {
 	return s.nextOffset - 1, nil
 }
 
-func (s *Segment) Read(offset uint32) ([]byte, error) {
+func (s *Segment) Read(offset uint64) ([]byte, error) {
 	if offset > s.nextOffset {
 		return nil, io.EOF // Offset not within segment
 	}
@@ -85,7 +85,7 @@ func (s *Segment) Close() error {
 	return s.index.Close()
 }
 
-func formatName(startOffset uint32, dir, ext string) string {
+func formatName(startOffset uint64, dir, ext string) string {
 	return filepath.Join(dir, fmt.Sprintf("%d%s", startOffset, ext))
 }
 

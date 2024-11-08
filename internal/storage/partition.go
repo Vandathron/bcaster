@@ -53,7 +53,7 @@ func NewPartition(topic string, c cfg.Partition) (*Partition, error) {
 			return nil, fmt.Errorf("invalid segment name. should be an integer: %s", segment.Name())
 		}
 
-		p.cfg.Segment.StartOffset = uint32(startOffset)
+		p.cfg.Segment.StartOffset = uint64(startOffset)
 
 		s, err := NewSegment(partitionDir, p.cfg.Segment)
 
@@ -66,7 +66,7 @@ func NewPartition(topic string, c cfg.Partition) (*Partition, error) {
 	}
 
 	if len(segments) == 0 { // indicates an empty partition
-		p.cfg.Segment.StartOffset = uint32(0)
+		p.cfg.Segment.StartOffset = uint64(0)
 		s, err := NewSegment(partitionDir, p.cfg.Segment)
 
 		if err != nil {
@@ -79,7 +79,7 @@ func NewPartition(topic string, c cfg.Partition) (*Partition, error) {
 	return p, nil
 }
 
-func (p *Partition) Append(message []byte) (uint32, error) {
+func (p *Partition) Append(message []byte) (uint64, error) {
 	off, err := p.writableSegment.Append(message)
 	if err != nil {
 		if err == io.EOF { // indicates a full segment and should create a new segment, then add/update writable segment
@@ -101,7 +101,7 @@ func (p *Partition) Append(message []byte) (uint32, error) {
 	return off, nil
 }
 
-func (p *Partition) Read(offset uint32) (message []byte, err error) {
+func (p *Partition) Read(offset uint64) (message []byte, err error) {
 	segment := p.getOffsetSegment(offset)
 	if segment == nil {
 		return nil, fmt.Errorf("invalid offset: %d", offset)
@@ -110,7 +110,7 @@ func (p *Partition) Read(offset uint32) (message []byte, err error) {
 	return segment.Read(offset)
 }
 
-func (p *Partition) getOffsetSegment(offset uint32) *Segment {
+func (p *Partition) getOffsetSegment(offset uint64) *Segment {
 	for _, segment := range p.segments {
 		if offset >= segment.cfg.StartOffset && offset < segment.nextOffset {
 			return segment
