@@ -16,8 +16,8 @@ func TestNewConsumerMgr(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	m, err := NewConsumerMgr(cfg.Consumer{
-		MaxSize: 1024 * 600, // 600KB
-		Dir:     dir,
+		MaxSizeByte: 1024 * 600, // 600KB
+		Dir:         dir,
 	})
 
 	require.NoError(t, err)
@@ -40,8 +40,8 @@ func TestConsumerMgr_Subscribe(t *testing.T) {
 	dir, err := os.MkdirTemp("", "consumers")
 	require.NoError(t, err)
 	c := cfg.Consumer{
-		MaxSize: 1024 * 70, // 70kb
-		Dir:     dir,
+		MaxSizeByte: 1024 * 70, // 70kb
+		Dir:         dir,
 	}
 	m, err := NewConsumerMgr(c)
 	defer func() {
@@ -104,8 +104,8 @@ func TestConsumerMgr_Read(t *testing.T) {
 	dir, err := os.MkdirTemp("", "consumers")
 	require.NoError(t, err)
 	m, err := NewConsumerMgr(cfg.Consumer{
-		MaxSize: 1024 * 600,
-		Dir:     dir,
+		MaxSizeByte: 1024 * 600,
+		Dir:         dir,
 	})
 	require.NoError(t, err)
 	defer func() {

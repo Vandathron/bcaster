@@ -26,8 +26,8 @@ type Consumer struct {
 
 func NewConsumerMgr(cfg cfg.Consumer) (*Consumer, error) {
 
-	if cfg.MaxSize == 0 || cfg.MaxSize < 1024*70 { // 70kb
-		cfg.MaxSize = (1024 * 1024) / 0.5 // 0.5mb
+	if cfg.MaxSizeByte == 0 || cfg.MaxSizeByte < 1024*70 { // 70kb
+		cfg.MaxSizeByte = (1024 * 1024) / 0.5 // 0.5mb
 	}
 
 	m := &Consumer{cfg: cfg}
@@ -51,7 +51,7 @@ func NewConsumerMgr(cfg cfg.Consumer) (*Consumer, error) {
 		}
 		baseOff, _ := strconv.Atoi(strings.TrimSuffix(file.Name(), path.Ext(file.Name())))
 		filePath := filepath.Join(m.cfg.Dir, file.Name())
-		c, err := storage.NewConsumer(filePath, m.cfg.MaxSize, uint32(baseOff))
+		c, err := storage.NewConsumer(filePath, m.cfg.MaxSizeByte, uint32(baseOff))
 		if err != nil {
 			func() {
 				for _, consumer := range m.consumers {
@@ -139,6 +139,7 @@ func (m *Consumer) Read(id, topic string) (readOff uint64, err error) {
 	}); err != nil {
 		return 0, err
 	}
+
 	if consumers, ok := m.topicToConsumer[topic]; ok {
 		for _, c := range consumers {
 			if c.ID == id {
@@ -223,7 +224,7 @@ func (m *Consumer) getConsumer(c *model.Consumer) model.Consumer {
 
 func (m *Consumer) injectNewActiveConsumer(name string, baseOff uint32) error {
 	p := filepath.Join(m.cfg.Dir, name)
-	c, err := storage.NewConsumer(p, m.cfg.MaxSize, baseOff)
+	c, err := storage.NewConsumer(p, m.cfg.MaxSizeByte, baseOff)
 	if err != nil {
 		return err
 	}
