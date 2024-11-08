@@ -5,4 +5,5 @@ type Consumer struct {
 	Topic      string
 	ReadOffset uint64
 	Off        uint32
+	AutoCommit bool
 }
