@@ -9,20 +9,20 @@ import (
 )
 
 const (
-	offsetWidth     = 4                         // offset value in index file should occupy 4 bytes in space
+	offsetWidth     = 8                         // offset value in index file should occupy 8 bytes in space
 	msgPosWidth     = 8                         // Message pos value in index file should occupy 8 bytes in space
-	indexEntryWidth = offsetWidth + msgPosWidth // Full index entry by logic should occupy 12 bytes
+	indexEntryWidth = offsetWidth + msgPosWidth // Full index entry by logic should occupy 16 bytes
 )
 
-type msgIdx struct {
+type MsgIdx struct {
 	file     *os.File
 	mmap     gommap.MMap
 	currSize uint64
 	cfg      cfg.Index
 }
 
-func NewIndex(fileName string, cfg cfg.Index) (*msgIdx, error) {
-	idx := &msgIdx{cfg: cfg}
+func NewIndex(fileName string, cfg cfg.Index) (*MsgIdx, error) {
+	idx := &MsgIdx{cfg: cfg}
 	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
 
 	if err != nil {
@@ -47,12 +47,12 @@ func NewIndex(fileName string, cfg cfg.Index) (*msgIdx, error) {
 	return idx, nil
 }
 
-func (i *msgIdx) Append(off uint32, pos uint64) error {
+func (i *MsgIdx) Append(off uint64, pos uint64) error {
 	if indexEntryWidth+i.currSize > i.cfg.MaxSizeByte {
 		return io.EOF
 	}
 
-	binary.BigEndian.PutUint32(i.mmap[i.currSize:i.currSize+offsetWidth], off)
+	binary.BigEndian.PutUint64(i.mmap[i.currSize:i.currSize+offsetWidth], off)
 	binary.BigEndian.PutUint64(i.mmap[i.currSize+offsetWidth:i.currSize+indexEntryWidth], pos)
 	i.currSize += indexEntryWidth
 
@@ -60,11 +60,11 @@ func (i *msgIdx) Append(off uint32, pos uint64) error {
 	return err
 }
 
-func (i *msgIdx) Read(off uint32) (uint64, error) {
+func (i *MsgIdx) Read(off uint64) (uint64, error) {
 	entryStartPos := off * indexEntryWidth
 	entryEndPos := entryStartPos + indexEntryWidth
 
-	if uint64(entryEndPos) > i.currSize { // Check offset is within index entries
+	if entryEndPos > i.currSize { // Check offset is within index entries
 		return 0, io.EOF
 	}
 
@@ -72,7 +72,7 @@ func (i *msgIdx) Read(off uint32) (uint64, error) {
 	return entryPos, nil
 }
 
-func (i *msgIdx) LastEntry() (off uint32, pos uint64, err error) {
+func (i *MsgIdx) LastEntry() (off uint64, pos uint64, err error) {
 	if indexEntryWidth > i.currSize { // Should have at least one entry
 		err = io.EOF
 		return
@@ -80,13 +80,13 @@ func (i *msgIdx) LastEntry() (off uint32, pos uint64, err error) {
 
 	startPos := i.currSize - indexEntryWidth
 
-	off = binary.BigEndian.Uint32(i.mmap[startPos : startPos+offsetWidth])
+	off = binary.BigEndian.Uint64(i.mmap[startPos : startPos+offsetWidth])
 	pos = binary.BigEndian.Uint64(i.mmap[startPos+offsetWidth : startPos+indexEntryWidth])
 
 	return off, pos, nil
 }
 
-func (i *msgIdx) Close() error {
+func (i *MsgIdx) Close() error {
 	if err := i.mmap.Sync(gommap.MS_SYNC); err != nil { // synchronously flush to file
 		return err
 	}
@@ -101,13 +101,13 @@ func (i *msgIdx) Close() error {
 	return i.file.Close()
 }
 
-func (i *msgIdx) Discard() error {
+func (i *MsgIdx) Discard() error {
 	if err := i.Close(); err != nil {
 		return err
 	}
 	return os.Remove(i.file.Name())
 }
 
-func (i *msgIdx) IsMaxedOut() bool {
+func (i *MsgIdx) IsMaxedOut() bool {
 	return i.currSize+indexEntryWidth >= i.cfg.MaxSizeByte
 }
