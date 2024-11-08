@@ -17,7 +17,7 @@ func TestNewPartition(t *testing.T) {
 
 	topic := "customer_created"
 	config := cfg.Partition{
-		BaseDir: dir,
+		Dir: dir,
 		Segment: cfg.Segment{
 			MaxIdxSizeByte: 1024,
 			MaxMsgSizeByte: 800,
@@ -144,7 +144,7 @@ func getTestMsgByte(id int) []byte {
 
 func getPartitionConfig(dir string) cfg.Partition {
 	return cfg.Partition{
-		BaseDir: dir,
+		Dir: dir,
 		Segment: cfg.Segment{
 			MaxIdxSizeByte: 1024 * 500,
 			MaxMsgSizeByte: 1024 * 1024,

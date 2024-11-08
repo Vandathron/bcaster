@@ -20,7 +20,7 @@ type Partition struct {
 }
 
 func NewPartition(topic string, c cfg.Partition) (*Partition, error) {
-	partitionDir := filepath.Join(c.BaseDir, fmt.Sprintf("part_%s", topic))
+	partitionDir := filepath.Join(c.Dir, fmt.Sprintf("part_%s", topic))
 	if err := os.MkdirAll(partitionDir, 0750); err != nil {
 		return nil, err
 	}
@@ -79,8 +79,8 @@ func NewPartition(topic string, c cfg.Partition) (*Partition, error) {
 	return p, nil
 }
 
-func (p *Partition) Append(message []byte) (uint64, error) {
-	off, err := p.writableSegment.Append(message)
+func (p *Partition) Append(msg []byte) (uint64, error) {
+	off, err := p.writableSegment.Append(msg)
 	if err != nil {
 		if err == io.EOF { // indicates a full segment and should create a new segment, then add/update writable segment
 			p.cfg.Segment.StartOffset = p.writableSegment.nextOffset
@@ -93,7 +93,7 @@ func (p *Partition) Append(message []byte) (uint64, error) {
 
 			p.segments = append(p.segments, s)
 			p.writableSegment = s
-			return p.Append(message)
+			return p.Append(msg)
 		}
 		return 0, err
 	}
@@ -101,7 +101,7 @@ func (p *Partition) Append(message []byte) (uint64, error) {
 	return off, nil
 }
 
-func (p *Partition) Read(offset uint64) (message []byte, err error) {
+func (p *Partition) Read(offset uint64) (msg []byte, err error) {
 	segment := p.getOffsetSegment(offset)
 	if segment == nil {
 		return nil, fmt.Errorf("invalid offset: %d", offset)
@@ -120,7 +120,7 @@ func (p *Partition) getOffsetSegment(offset uint64) *Segment {
 }
 
 func (p *Partition) Name() string {
-	return filepath.Join(p.cfg.BaseDir, fmt.Sprintf("part_%s", p.topic))
+	return filepath.Join(p.cfg.Dir, fmt.Sprintf("part_%s", p.topic))
 }
 
 func (p *Partition) Close() error {
