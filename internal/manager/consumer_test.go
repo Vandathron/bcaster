@@ -74,7 +74,7 @@ func TestConsumerMgr_Subscribe(t *testing.T) {
 	}
 
 	sub.Wait()
-	requireCommon := func(m *ConsumerMgr) {
+	requireCommon := func(m *Consumer) {
 		require.NotNil(t, m.activeConsumer)
 		require.Equal(t, 2, len(m.consumers))                                  // should have exactly 2 consumer files (918 & 82 entries)
 		require.Equal(t, uint32(918-1), m.consumers[0].LatestCommitedOff())    // zero based offset
