@@ -14,7 +14,7 @@ type Store struct {
 
 func NewStore(config cfg.Store) (*Store, error) {
 	s := &Store{}
-
+	s.topicToPartition = make(map[string]*storage.Partition)
 	mgr, err := NewConsumerMgr(config.Consumer)
 	if err != nil {
 		return nil, err
@@ -58,14 +58,28 @@ func (s *Store) Read(consumer model.Consumer) (msg []byte, err error) {
 
 func (s *Store) Append(msg []byte, topic string) error {
 	p, ok := s.topicToPartition[topic]
+	var err error
 	if !ok { // partition may have not been loaded or closed
-		p, err := storage.NewPartition(topic, s.config.Partition)
+		p, err = storage.NewPartition(topic, s.config.Partition)
 		if err != nil {
 			return err
 		}
 		s.topicToPartition[topic] = p
 	}
 
-	_, err := p.Append(msg)
+	_, err = p.Append(msg)
 	return err
+}
+
+func (s *Store) Close() error {
+	if err := s.cMgr.Close(); err != nil {
+		return err
+	}
+
+	for _, p := range s.topicToPartition {
+		if err := p.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
