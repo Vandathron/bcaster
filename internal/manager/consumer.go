@@ -16,7 +16,7 @@ import (
 	"sync"
 )
 
-type ConsumerMgr struct {
+type Consumer struct {
 	consumers       []*storage.Consumer
 	topicToConsumer map[string][]*model.Consumer
 	cfg             cfg.Consumer
@@ -24,13 +24,13 @@ type ConsumerMgr struct {
 	lock            sync.Mutex
 }
 
-func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
+func NewConsumerMgr(cfg cfg.Consumer) (*Consumer, error) {
 
 	if cfg.MaxSize == 0 || cfg.MaxSize < 1024*70 { // 70kb
 		cfg.MaxSize = (1024 * 1024) / 0.5 // 0.5mb
 	}
 
-	m := &ConsumerMgr{cfg: cfg}
+	m := &Consumer{cfg: cfg}
 	consumerFiles, err := os.ReadDir(m.cfg.Dir)
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func NewConsumerMgr(cfg cfg.Consumer) (*ConsumerMgr, error) {
 	return m, nil
 }
 
-func (m *ConsumerMgr) Subscribe(consumer model.Consumer) error {
+func (m *Consumer) Subscribe(consumer model.Consumer) error {
 	if err := m.validate(consumer); err != nil {
 		return err
 	}
@@ -132,7 +132,13 @@ func (m *ConsumerMgr) Subscribe(consumer model.Consumer) error {
 	return nil
 }
 
-func (m *ConsumerMgr) Read(id, topic string) (readOff uint64, err error) {
+func (m *Consumer) Read(id, topic string) (readOff uint64, err error) {
+	if err = m.validate(model.Consumer{
+		ID:    id,
+		Topic: topic,
+	}); err != nil {
+		return 0, err
+	}
 	if consumers, ok := m.topicToConsumer[topic]; ok {
 		for _, c := range consumers {
 			if c.ID == id {
@@ -145,7 +151,7 @@ func (m *ConsumerMgr) Read(id, topic string) (readOff uint64, err error) {
 	return 0, fmt.Errorf("topic not found")
 }
 
-func (m *ConsumerMgr) ReadTopic(topic string) ([]model.Consumer, error) {
+func (m *Consumer) ReadTopic(topic string) ([]model.Consumer, error) {
 	if consumers, ok := m.topicToConsumer[topic]; ok {
 		var c []model.Consumer
 		for _, con := range consumers {
@@ -157,7 +163,7 @@ func (m *ConsumerMgr) ReadTopic(topic string) ([]model.Consumer, error) {
 	return nil, fmt.Errorf("topic not found")
 }
 
-func (m *ConsumerMgr) Ack(id, topic string) error {
+func (m *Consumer) Ack(id, topic string) error {
 	if consumers, ok := m.topicToConsumer[topic]; ok {
 		for _, c := range consumers {
 			if c.ID == id {
@@ -173,7 +179,7 @@ func (m *ConsumerMgr) Ack(id, topic string) error {
 	return fmt.Errorf("topic not found")
 }
 
-func (m *ConsumerMgr) Unsubscribe(id, topic string) error {
+func (m *Consumer) Unsubscribe(id, topic string) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	if consumers, ok := m.topicToConsumer[topic]; ok {
@@ -201,7 +207,7 @@ func (m *ConsumerMgr) Unsubscribe(id, topic string) error {
 	return fmt.Errorf("topic not found")
 }
 
-func (m *ConsumerMgr) Close() error {
+func (m *Consumer) Close() error {
 	for _, consumer := range m.consumers {
 		err := consumer.Close()
 		if err != nil {
@@ -211,11 +217,11 @@ func (m *ConsumerMgr) Close() error {
 	return nil
 }
 
-func (m *ConsumerMgr) getConsumer(c *model.Consumer) model.Consumer {
+func (m *Consumer) getConsumer(c *model.Consumer) model.Consumer {
 	return *c
 }
 
-func (m *ConsumerMgr) injectNewActiveConsumer(name string, baseOff uint32) error {
+func (m *Consumer) injectNewActiveConsumer(name string, baseOff uint32) error {
 	p := filepath.Join(m.cfg.Dir, name)
 	c, err := storage.NewConsumer(p, m.cfg.MaxSize, baseOff)
 	if err != nil {
@@ -226,7 +232,7 @@ func (m *ConsumerMgr) injectNewActiveConsumer(name string, baseOff uint32) error
 	return err
 }
 
-func (m *ConsumerMgr) validate(consumer model.Consumer) error {
+func (m *Consumer) validate(consumer model.Consumer) error {
 	if len([]byte(consumer.Topic)) > storage.TopicSize {
 		return errors.New("topic exceeds allowed size")
 	}
@@ -238,7 +244,7 @@ func (m *ConsumerMgr) validate(consumer model.Consumer) error {
 	return nil
 }
 
-func (m *ConsumerMgr) consumerStoreByOffset(off uint32) *storage.Consumer {
+func (m *Consumer) consumerStoreByOffset(off uint32) *storage.Consumer {
 	if len(m.consumers) == 0 {
 		return nil
 	}
