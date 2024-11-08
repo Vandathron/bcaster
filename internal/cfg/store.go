@@ -1,6 +1,6 @@
 package cfg
 
 type Store struct {
-	Consumer
-	Partition
+	Consumer  Consumer
+	Partition Partition
 }

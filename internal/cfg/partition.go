@@ -1,6 +1,6 @@
 package cfg
 
 type Partition struct {
-	BaseDir string
+	Dir string
 	Segment
 }
