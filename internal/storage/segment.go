@@ -85,6 +85,10 @@ func (s *Segment) Close() error {
 	return s.index.Close()
 }
 
+func (s *Segment) LatestCommittedOff() uint64 {
+	return s.nextOffset - 1
+}
+
 func formatName(startOffset uint64, dir, ext string) string {
 	return filepath.Join(dir, fmt.Sprintf("%d%s", startOffset, ext))
 }
