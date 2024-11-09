@@ -27,7 +27,7 @@ func TestNewConsumerMgr(t *testing.T) {
 		Topic:      "user_created",
 		ReadOffset: 50,
 	}
-	err = m.Subscribe(c)
+	err = m.Add(c)
 	require.NoError(t, err)
 
 	require.NotNil(t, m.activeConsumer)
@@ -67,7 +67,7 @@ func TestConsumerMgr_Subscribe(t *testing.T) {
 					Topic:      "user_created_" + strconv.Itoa(i),
 					ReadOffset: uint64(j + 1),
 				}
-				err = m.Subscribe(c)
+				err = m.Add(c)
 				require.NoError(t, err)
 			}
 		}()
@@ -92,7 +92,7 @@ func TestConsumerMgr_Subscribe(t *testing.T) {
 
 	// unsubscribe all consumers in user_created_1 topic
 	for i := 200; i < 300; i++ {
-		err := m.Unsubscribe("user_service_"+strconv.Itoa(i), "user_created_"+strconv.Itoa(1))
+		err := m.Remove("user_service_"+strconv.Itoa(i), "user_created_"+strconv.Itoa(1))
 		require.NoError(t, err)
 	}
 	requireCommon(m)
