@@ -104,7 +104,7 @@ func (p *Partition) Append(msg []byte) (uint64, error) {
 func (p *Partition) Read(offset uint64) (msg []byte, err error) {
 	segment := p.getOffsetSegment(offset)
 	if segment == nil {
-		return nil, fmt.Errorf("invalid offset: %d", offset)
+		return nil, io.EOF
 	}
 
 	return segment.Read(offset)
