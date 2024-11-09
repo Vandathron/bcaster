@@ -24,15 +24,15 @@ func NewStore(config cfg.Store) (*Store, error) {
 	return s, nil
 }
 
-func (s *Store) Read(consumer model.Consumer) (msg []byte, err error) {
-	readOff, err := s.cMgr.Read(consumer.ID, consumer.Topic)
+func (s *Store) Read(c model.Consumer) (msg []byte, err error) {
+	readOff, err := s.cMgr.Read(c.ID, c.Topic)
 	if err != nil {
 		return nil, err
 	}
 
-	p, ok := s.topicToPartition[consumer.Topic]
+	p, ok := s.topicToPartition[c.Topic]
 	if !ok { // partition may have not been loaded or closed
-		p, err = storage.NewPartition(consumer.Topic, s.config.Partition)
+		p, err = storage.NewPartition(c.Topic, s.config.Partition)
 
 		if err != nil {
 			return nil, err
@@ -45,8 +45,8 @@ func (s *Store) Read(consumer model.Consumer) (msg []byte, err error) {
 		return nil, err
 	}
 
-	if consumer.AutoCommit {
-		err = s.cMgr.Ack(consumer.ID, consumer.Topic)
+	if c.AutoCommit {
+		err = s.cMgr.Ack(c.ID, c.Topic)
 
 		if err != nil {
 			return nil, err
@@ -69,6 +69,24 @@ func (s *Store) Append(msg []byte, topic string) error {
 
 	_, err = p.Append(msg)
 	return err
+}
+
+func (s *Store) AddConsumer(c model.Consumer) error {
+	p, ok := s.topicToPartition[c.Topic]
+	var err error
+	if !ok {
+		p, err = storage.NewPartition(c.Topic, s.config.Partition)
+		if err != nil {
+			return err
+		}
+		s.topicToPartition[c.Topic] = p
+	}
+	c.ReadOffset = p.LatestCommitedOff() + 1 // future read offset
+	return s.cMgr.Add(c)
+}
+
+func (s *Store) RemoveConsumer(c model.Consumer) error {
+	return s.cMgr.Remove(c.ID, c.Topic)
 }
 
 func (s *Store) Close() error {
