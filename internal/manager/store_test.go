@@ -3,6 +3,8 @@ package manager
 import (
 	"github.com/stretchr/testify/require"
 	"github.com/vandathron/bcaster/internal/cfg"
+	"github.com/vandathron/bcaster/internal/model"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,9 +31,8 @@ func TestNewStore(t *testing.T) {
 	require.NotNil(t, store.cMgr)
 }
 
-func TestStore_Append(t *testing.T) {
+func TestStore_Append_Read(t *testing.T) {
 	dir, err := os.MkdirTemp("", "store_test")
-
 	defer func() {
 		_ = os.RemoveAll(dir)
 	}()
@@ -46,13 +47,27 @@ func TestStore_Append(t *testing.T) {
 	store, err := NewStore(config)
 	require.NoError(t, err)
 
-	err = store.Append([]byte("Hello world"), "created")
+	err = store.Append([]byte("Hello world"), "topic_A")
 	require.NoError(t, err)
 	require.NoError(t, store.Close())
-}
 
-func TestStore_Read(t *testing.T) {
+	store, err = NewStore(config)
+	require.NoError(t, err)
 
+	c := model.Consumer{ID: "new_consumer", Topic: "topic_A"}
+	c.AutoCommit = true
+
+	require.NoError(t, store.AddConsumer(c))
+	msgByte, err := store.Read(c)
+	require.Equal(t, io.EOF, err)
+	require.Nil(t, msgByte)
+
+	require.NoError(t, store.Append([]byte("Second hello world"), "topic_A"))
+	require.NoError(t, store.AddConsumer(c)) // expects not to duplicate consumer in storage
+	msgByte, err = store.Read(c)
+	require.NoError(t, err)
+	require.Equal(t, []byte("Second hello world"), msgByte)
+	require.NoError(t, store.Close())
 }
 
 func getCfg(cdir, pDir string) cfg.Store {
@@ -70,10 +85,3 @@ func getCfg(cdir, pDir string) cfg.Store {
 		},
 	}
 }
-
-//
-//
-//
-//
-//
-//
