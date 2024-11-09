@@ -22,6 +22,7 @@ type Consumer struct {
 	cfg             cfg.Consumer
 	activeConsumer  *storage.Consumer
 	lock            sync.Mutex
+	cOffLock        sync.Mutex
 }
 
 func NewConsumerMgr(cfg cfg.Consumer) (*Consumer, error) {
@@ -97,7 +98,7 @@ func NewConsumerMgr(cfg cfg.Consumer) (*Consumer, error) {
 	return m, nil
 }
 
-func (m *Consumer) Subscribe(consumer model.Consumer) error {
+func (m *Consumer) Add(consumer model.Consumer) error {
 	if err := m.validate(consumer); err != nil {
 		return err
 	}
@@ -168,9 +169,9 @@ func (m *Consumer) Ack(id, topic string) error {
 	if consumers, ok := m.topicToConsumer[topic]; ok {
 		for _, c := range consumers {
 			if c.ID == id {
-				m.lock.Unlock()
+				m.cOffLock.Lock()
 				c.ReadOffset++
-				m.lock.Lock()
+				m.cOffLock.Unlock()
 				return nil
 			}
 		}
@@ -180,7 +181,7 @@ func (m *Consumer) Ack(id, topic string) error {
 	return fmt.Errorf("topic not found")
 }
 
-func (m *Consumer) Unsubscribe(id, topic string) error {
+func (m *Consumer) Remove(id, topic string) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	if consumers, ok := m.topicToConsumer[topic]; ok {
