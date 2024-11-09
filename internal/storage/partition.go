@@ -131,3 +131,7 @@ func (p *Partition) Close() error {
 	}
 	return nil
 }
+
+func (p *Partition) LatestCommitedOff() uint64 {
+	return p.writableSegment.LatestCommittedOff()
+}
