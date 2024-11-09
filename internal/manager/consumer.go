@@ -197,9 +197,9 @@ func (m *Consumer) Remove(id, topic string) error {
 				}
 				consumers = append(consumers[:i], consumers[i+1:]...)
 				m.topicToConsumer[topic] = consumers
-				if len(consumers) == 0 {
-					delete(m.topicToConsumer, topic)
-				}
+				//if len(consumers) == 0 {
+				//	delete(m.topicToConsumer, topic)
+				//}
 				return nil
 			}
 		}
